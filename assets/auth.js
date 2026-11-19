@@ -46,21 +46,25 @@ function currentLang() {
 const saved = localStorage.getItem("digibaku_lang");
 return MESSAGES[saved] ? saved : "az";
 }
+
 function msg(key) {
 const set = MESSAGES[currentLang()];
 return set[key] || MESSAGES.az[key] || key;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+.[^\s@]{2,}$/;
+
 function validateEmail(email) {
 return EMAIL_RE.test(String(email || "").trim());
 }
+
 function validatePassword(password) {
 return typeof password === "string" && password.length >= 8;
 }
 
 async function call(path, body, method) {
 let res;
+
 try {
 res = await fetch(AUTH_BASE + path, {
 method: method || "POST",
@@ -71,66 +75,128 @@ body: body ? JSON.stringify(body) : undefined
 } catch (e) {
 return { ok: false, error: msg("networkError") };
 }
+
 let data = null;
-try { data = await res.json(); } catch (e) { data = null; }
+
+try {
+data = await res.json();
+} catch (e) {
+data = null;
+}
+
 if (!res.ok) {
 const serverMsg = data && (data.message || (data.error && data.error.message));
 return { ok: false, status: res.status, error: serverMsg || msg("genericError") };
 }
+
 return { ok: true, data };
 }
 
+/* JWT token əldə etmək */
+let neonJWTClient = null;
+
+async function getJWTToken() {
+try {
+if (!neonJWTClient) {
+const neon = await import("https://esm.sh/@neondatabase/auth");
+
+if (!neon.createInternalNeonAuth) {
+throw new Error("Neon Auth SDK tapılmadı.");
+}
+
+neonJWTClient = neon.createInternalNeonAuth(AUTH_BASE);
+}
+
+return await neonJWTClient.getJWTToken();
+
+} catch (error) {
+console.error("JWT alınmadı:", error);
+return null;
+}
+}
+
 const DigiAuth = {
+
 async register({ name, email, password }) {
 if (!name || !name.trim()) return { ok: false, error: msg("nameRequired") };
 if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
 if (!validatePassword(password)) return { ok: false, error: msg("shortPassword") };
-const r = await call("/sign-up/email", { name: name.trim(), email: email.trim(), password });
+
+const r = await call("/sign-up/email", {
+name: name.trim(),
+email: email.trim(),
+password
+});
+
 if (!r.ok) return r;
+
 return { ok: true, message: msg("registered"), data: r.data };
 },
 
-async login({ email, password }) {  
-  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };  
-  if (!password) return { ok: false, error: msg("shortPassword") };  
-  const r = await call("/sign-in/email", { email: email.trim(), password });  
-  if (!r.ok) return r;  
-  return { ok: true, message: msg("loggedIn"), data: r.data };  
-},  
+async login({ email, password }) {
+if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
+if (!password) return { ok: false, error: msg("shortPassword") };
 
-async logout() {  
-  const r = await call("/sign-out", {});  
-  return r.ok ? { ok: true, message: msg("loggedOut") } : r;  
-},  
+const r = await call("/sign-in/email", {
+email: email.trim(),
+password
+});
 
-async getSession() {  
-  const r = await call("/get-session", null, "GET");  
-  if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };  
-  return { ok: true, session: r.data };  
-},  
+if (!r.ok) return r;
 
-async requestPasswordReset({ email, redirectTo }) {  
-  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };  
-  const r = await call("/request-password-reset", {  
-    email: email.trim(),  
-    redirectTo: redirectTo || (location.origin + "/login.html?reset=1")  
-  });  
-  if (!r.ok) return r;  
-  return { ok: true, message: msg("resetSent") };  
-},  
+return { ok: true, message: msg("loggedIn"), data: r.data };
+},
 
-async resetPassword({ token, newPassword }) {  
-  if (!validatePassword(newPassword)) return { ok: false, error: msg("shortPassword") };  
-  const r = await call("/reset-password", { token, newPassword });  
-  if (!r.ok) return r;  
-  return { ok: true, message: msg("passwordReset") };  
-},  
+async logout() {
+const r = await call("/sign-out", {});
 
-msg,  
-validateEmail,  
+return r.ok
+? { ok: true, message: msg("loggedOut") }
+: r;
+},
+
+async getSession() {
+const r = await call("/get-session", null, "GET");
+
+if (!r.ok || !r.data || !r.data.user) {
+return { ok: true, session: null };
+}
+
+return { ok: true, session: r.data };
+},
+
+async requestPasswordReset({ email, redirectTo }) {
+if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
+
+const r = await call("/request-password-reset", {
+email: email.trim(),
+redirectTo: redirectTo || (location.origin + "/login.html?reset=1")
+});
+
+if (!r.ok) return r;
+
+return { ok: true, message: msg("resetSent") };
+},
+
+async resetPassword({ token, newPassword }) {
+if (!validatePassword(newPassword)) {
+return { ok: false, error: msg("shortPassword") };
+}
+
+const r = await call("/reset-password", { token, newPassword });
+
+if (!r.ok) return r;
+
+return { ok: true, message: msg("passwordReset") };
+},
+
+getJWTToken,
+
+msg,
+validateEmail,
 validatePassword
 
 };
 
 window.DigiAuth = DigiAuth;
-})(); 
+})();
