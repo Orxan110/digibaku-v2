@@ -1,48 +1,56 @@
 import { $, money, getLang, setLang, api, token, sb, toast, errMsg, monthsLabel } from './common.js';
 
 const UI = {
-  az: { cart:'Səbət', total:'Ümumi', checkout:'Sifarişi təsdiq et', cartEmpty:'Səbətiniz boşdur', add:'Səbətə at',
-        order:'Sifariş et', details:'Ətraflı', noPrice:'Qiymət üçün bizimlə əlaqə saxlayın', all:'Hamısı',
-        products:'Məhsullar', categories:'Kateqoriyalar', reviews:'Müştəri rəyləri', faq:'Tez-tez verilən suallar',
-        noResults:'Axtarışa uyğun məhsul tapılmadı.', noProducts:'Hazırda aktiv məhsul yoxdur.', loading:'Yüklənir…',
-        loadError:'Məlumat yüklənə bilmədi. Səhifəni yeniləyin.', login:'Daxil ol', profile:'Profil',
-        loginNeeded:'Sifariş üçün daxil olun.', added:'Səbətə əlavə olundu', ordered:'Sifariş yaradıldı',
-        qty:'Say', remove:'Sil', links:'Keçidlər', contact:'Əlaqə', prices:'Qiymətlər', chat:'Çat', account:'Hesab',
-        heroTitle:'Premium rəqəmsal xidmətlər', heroSub:'Netflix, YouTube Premium, ChatGPT və digər abunəliklər bir platformada.',
-        heroCta:'Məhsullara bax', searchPh:'Məhsul axtar…', footText:'Premium rəqəmsal xidmətlər bir platformada.',
-        priceNote:'Qiymət sifariş zamanı serverdə yenidən hesablanır.', selectPlan:'Müddət', cartFull:'Səbət doludur.' },
-  ru: { cart:'Корзина', total:'Итого', checkout:'Подтвердить заказ', cartEmpty:'Корзина пуста', add:'В корзину',
-        order:'Заказать', details:'Подробнее', noPrice:'Свяжитесь с нами для уточнения цены', all:'Все',
-        products:'Товары', categories:'Категории', reviews:'Отзывы клиентов', faq:'Частые вопросы',
-        noResults:'По запросу ничего не найдено.', noProducts:'Сейчас нет активных товаров.', loading:'Загрузка…',
-        loadError:'Не удалось загрузить данные. Обновите страницу.', login:'Войти', profile:'Профиль',
-        loginNeeded:'Войдите, чтобы оформить заказ.', added:'Добавлено в корзину', ordered:'Заказ создан',
-        qty:'Кол-во', remove:'Удалить', links:'Ссылки', contact:'Контакты', prices:'Цены', chat:'Чат', account:'Аккаунт',
-        heroTitle:'Премиальные цифровые услуги', heroSub:'Netflix, YouTube Premium, ChatGPT и другие подписки на одной платформе.',
-        heroCta:'Смотреть товары', searchPh:'Поиск товаров…', footText:'Премиальные цифровые услуги на одной платформе.',
-        priceNote:'Цена пересчитывается на сервере при оформлении.', selectPlan:'Срок', cartFull:'Корзина заполнена.' },
-  en: { cart:'Cart', total:'Total', checkout:'Confirm order', cartEmpty:'Your cart is empty', add:'Add to cart',
-        order:'Order', details:'Details', noPrice:'Contact us for pricing', all:'All',
-        products:'Products', categories:'Categories', reviews:'Customer reviews', faq:'Frequently asked questions',
-        noResults:'No products match your search.', noProducts:'No active products right now.', loading:'Loading…',
-        loadError:'Could not load data. Please refresh the page.', login:'Log in', profile:'Profile',
-        loginNeeded:'Log in to place an order.', added:'Added to cart', ordered:'Order created',
-        qty:'Qty', remove:'Remove', links:'Links', contact:'Contact', prices:'Prices', chat:'Chat', account:'Account',
-        heroTitle:'Premium digital services', heroSub:'Netflix, YouTube Premium, ChatGPT and other subscriptions in one place.',
-        heroCta:'View products', searchPh:'Search products…', footText:'Premium digital services on one platform.',
-        priceNote:'Price is recalculated on the server at checkout.', selectPlan:'Term', cartFull:'Your cart is full.' },
+  az: { home:'Ana səhifə', products:'Məhsullar', cart:'Səbət', total:'Ümumi', checkout:'Sifarişi təsdiq et',
+        empty:'Səbətiniz boşdur', add:'Səbətə at', details:'Ətraflı', all:'Hamısı', reviews:'Müştəri rəyləri',
+        faq:'Tez-tez verilən suallar', noProducts:'Hazırda aktiv məhsul yoxdur.', noResults:'Axtarışa uyğun məhsul tapılmadı.',
+        loading:'Yüklənir…', loadError:'Məlumat yüklənə bilmədi. Səhifəni yeniləyin.', login:'Daxil ol', profile:'Profil',
+        loginNeeded:'Sifariş üçün daxil olun.', added:'Səbətə əlavə olundu', ordered:'Sifariş yaradıldı', remove:'Sil',
+        info:'Məlumat', contact:'Əlaqə', noText:'Məlumat hələ əlavə edilməyib.', noPrice:'Qiymət üçün bizimlə əlaqə saxlayın',
+        searchPh:'Məhsul axtar…', heroTitle:'Premium rəqəmsal xidmətlər',
+        heroSub:'Netflix, YouTube Premium, ChatGPT və digər abunəliklər bir platformada.', heroCta:'Məhsullara bax',
+        cartFull:'Səbət doludur.', note:'Qiymət sifariş zamanı serverdə yenidən hesablanır.',
+        about:'Haqqımızda', terms:'Şərtlər və qaydalar', privacy:'Məxfilik siyasəti', prices:'Qiymətlər', chat:'Canlı çat',
+        wa:'WhatsApp ilə yazın', footText:'Premium rəqəmsal xidmətlər bir platformada.', catTitle:'Nə axtarırsan?' },
+  ru: { home:'Главная', products:'Товары', cart:'Корзина', total:'Итого', checkout:'Подтвердить заказ',
+        empty:'Корзина пуста', add:'В корзину', details:'Подробнее', all:'Все', reviews:'Отзывы клиентов',
+        faq:'Частые вопросы', noProducts:'Сейчас нет активных товаров.', noResults:'По запросу ничего не найдено.',
+        loading:'Загрузка…', loadError:'Не удалось загрузить данные. Обновите страницу.', login:'Войти', profile:'Профиль',
+        loginNeeded:'Войдите, чтобы оформить заказ.', added:'Добавлено в корзину', ordered:'Заказ создан', remove:'Удалить',
+        info:'Информация', contact:'Контакты', noText:'Информация пока не добавлена.', noPrice:'Свяжитесь с нами для уточнения цены',
+        searchPh:'Поиск товаров…', heroTitle:'Премиальные цифровые услуги',
+        heroSub:'Netflix, YouTube Premium, ChatGPT и другие подписки на одной платформе.', heroCta:'Смотреть товары',
+        cartFull:'Корзина заполнена.', note:'Цена пересчитывается на сервере при оформлении.',
+        about:'О нас', terms:'Условия и правила', privacy:'Политика конфиденциальности', prices:'Цены', chat:'Онлайн-чат',
+        wa:'Написать в WhatsApp', footText:'Премиальные цифровые услуги на одной платформе.', catTitle:'Что ищете?' },
+  en: { home:'Home', products:'Products', cart:'Cart', total:'Total', checkout:'Confirm order',
+        empty:'Your cart is empty', add:'Add to cart', details:'Details', all:'All', reviews:'Customer reviews',
+        faq:'Frequently asked questions', noProducts:'No active products right now.', noResults:'No products match your search.',
+        loading:'Loading…', loadError:'Could not load data. Please refresh the page.', login:'Log in', profile:'Profile',
+        loginNeeded:'Log in to place an order.', added:'Added to cart', ordered:'Order created', remove:'Remove',
+        info:'Information', contact:'Contact', noText:'No information has been added yet.', noPrice:'Contact us for pricing',
+        searchPh:'Search products…', heroTitle:'Premium digital services',
+        heroSub:'Netflix, YouTube Premium, ChatGPT and other subscriptions in one place.', heroCta:'View products',
+        cartFull:'Your cart is full.', note:'Price is recalculated on the server at checkout.',
+        about:'About us', terms:'Terms and conditions', privacy:'Privacy policy', prices:'Prices', chat:'Live chat',
+        wa:'Chat on WhatsApp', footText:'Premium digital services on one platform.', catTitle:'What are you looking for?' },
 };
 
 const L = () => UI[getLang()] || UI.az;
-const CART_KEY = 'digi_cart_v2';
+const CART_KEY = 'digi_cart_v3';
 const MAX_ITEMS = 20;
-const ALLOWED_MONTHS = [1, 2, 3, 6, 12];
+const MONTHS = [1, 2, 3, 6, 12];
 
 let CATALOG = null;
+let lastJson = '';
 let activeCat = '';
 let query = '';
-let lastJson = '';
+let slideIndex = 0;
+let slideTimer = null;
 let cart = loadCart();
+const picked = new Map();
+
+/* ---------- köməkçilər ---------- */
 
 function h(tag, props, ...children) {
   const el = document.createElement(tag);
@@ -73,7 +81,7 @@ function loadCart() {
     const v = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
     if (!Array.isArray(v)) return [];
     return v
-      .filter((i) => i && typeof i.key === 'string' && ALLOWED_MONTHS.includes(i.months) && i.quantity >= 1)
+      .filter((i) => i && typeof i.key === 'string' && MONTHS.includes(i.months) && i.quantity >= 1 && i.quantity <= 10)
       .slice(0, MAX_ITEMS);
   } catch {
     return [];
@@ -83,6 +91,8 @@ function loadCart() {
 function saveCart() {
   try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch {}
 }
+
+/* ---------- yükləmə və render ---------- */
 
 async function load(force = false) {
   try {
@@ -95,40 +105,48 @@ async function load(force = false) {
     renderAll();
   } catch (e) {
     console.error('Katalog yüklənmədi:', e);
-    if (!CATALOG) $('#productBox').replaceChildren(h('p', { class: 'muted', text: L().loadError }));
+    if (!CATALOG) $('#productGrid').replaceChildren(h('p', { class: 'muted', text: L().loadError }));
   }
 }
 
 function renderAll() {
   applyStatic();
-  renderHero();
+  renderSlides();
   renderCats();
   renderProducts();
   renderReviews();
   renderFaq();
   renderFooter();
   renderCart();
-  updateCartCount();
+  updateCount();
 }
 
 function applyStatic() {
   const d = L();
-  const cartLabel = Array.from($('#cartBtn')?.childNodes || []).find((n) => n.nodeType === Node.TEXT_NODE);
-  if (cartLabel) cartLabel.nodeValue = `${d.cart} `;
-  const search = $('#search');
-  if (search) search.placeholder = d.searchPh;
-  setText('#catTitle', d.categories);
+  setText('#catTitle', d.catTitle);
   setText('#prodTitle', d.products);
   setText('#revTitle', d.reviews);
   setText('#faqTitle', d.faq);
   setText('#cartTitle', d.cart);
   setText('#cartTotalLabel', d.total);
   setText('#checkoutBtn', d.checkout);
-  setText('#cartNote', d.priceNote);
-  setText('#footLinksTitle', d.links);
-  setText('#footPrices', d.prices);
-  setText('#footChat', d.chat);
+  setText('#cartNote', d.note);
+  setText('#bnHomeT', d.home);
+  setText('#bnProductsT', d.products);
+  setText('#bnCartT', d.cart);
+  setText('#bnProfileT', d.profile);
+  setText('#footInfoTitle', d.info);
   setText('#footContactTitle', d.contact);
+  setText('#linkAbout', d.about);
+  setText('#linkTerms', d.terms);
+  setText('#linkPrivacy', d.privacy);
+  setText('#linkPrices', d.prices);
+  setText('#footChat', d.chat);
+  setText('#pageClose', '✕');
+  const search = $('#search');
+  if (search) search.placeholder = d.searchPh;
+  const wa = $('#footWa');
+  if (wa) wa.textContent = d.wa;
 }
 
 function markLang() {
@@ -139,39 +157,55 @@ function markLang() {
   });
 }
 
-function renderHero() {
-  if (!CATALOG) return;
-  const c = CATALOG.content || {};
+/* ---------- banner slayd ---------- */
+
+function slidesData() {
   const d = L();
-  setText('#heroTitle', c.hero_title || d.heroTitle);
-  setText('#heroSub', c.hero_subtitle || d.heroSub);
-  setText('#heroCta', c.hero_cta || d.heroCta);
-
-  const banners = CATALOG.banners || [];
-  const img = $('#heroImg');
-  const src = safeUrl(banners[0]?.image_url);
-  if (img) {
-    img.hidden = !src;
-    if (src) {
-      img.src = src;
-      img.alt = banners[0].title || '';
-    }
+  const c = CATALOG?.content || {};
+  const banners = (CATALOG?.banners || []).filter((b) => b.title || b.image_url);
+  if (banners.length) {
+    return banners.map((b) => ({
+      title: b.title, sub: b.subtitle, img: safeUrl(b.image_url), cta: b.cta_label, url: safeUrl(b.cta_url) || '#products',
+    }));
   }
+  return [{ title: c.hero_title || d.heroTitle, sub: c.hero_subtitle || d.heroSub, img: '', cta: c.hero_cta || d.heroCta, url: '#products' }];
+}
 
-  const promos = $('#promos');
-  if (promos) {
-    const rest = banners.slice(1, 3);
-    promos.replaceChildren(...rest.map((b) => h('a', { class: 'promo card', href: safeUrl(b.cta_url) || '#products' },
-      b.cta_label ? h('span', { class: 'tag', text: b.cta_label }) : null,
-      h('h3', { text: b.title || '' }),
-      b.subtitle ? h('p', { text: b.subtitle }) : null,
-    )));
-    promos.hidden = rest.length === 0;
+function renderSlides() {
+  const slides = slidesData();
+  slideIndex = Math.min(slideIndex, slides.length - 1);
+  const s = slides[slideIndex];
+  $('#slide').replaceChildren(
+    s.img ? h('img', { src: s.img, alt: '', class: 'slide-img' }) : null,
+    h('div', { class: 'slide-text' },
+      h('h1', { text: s.title || '' }),
+      s.sub ? h('p', { text: s.sub }) : null,
+      h('a', { class: 'btn btn-primary', href: s.url, text: s.cta || L().heroCta })),
+  );
+  const dots = $('#dots');
+  dots.hidden = slides.length < 2;
+  dots.replaceChildren(...slides.map((_, i) => h('button', {
+    type: 'button',
+    class: i === slideIndex ? 'dot on' : 'dot',
+    'aria-label': `${i + 1}`,
+    onclick: () => { slideIndex = i; renderSlides(); restartSlides(); },
+  })));
+}
+
+function restartSlides() {
+  clearInterval(slideTimer);
+  const n = slidesData().length;
+  if (n > 1) {
+    slideTimer = setInterval(() => {
+      slideIndex = (slideIndex + 1) % n;
+      renderSlides();
+    }, 6000);
   }
 }
 
+/* ---------- kateqoriyalar ---------- */
+
 function renderCats() {
-  if (!CATALOG) return;
   const d = L();
   const cats = CATALOG.categories || [];
   const counts = {};
@@ -188,11 +222,12 @@ function renderCats() {
   })));
 
   $('#catGrid').replaceChildren(...cats.map((c) => h('button', {
-    class: 'cat-card',
+    class: 'cat-tile',
     type: 'button',
+    'aria-pressed': String(activeCat === c.key),
     onclick: () => {
       setCat(c.key);
-      $('#products')?.scrollIntoView({ behavior: 'smooth' });
+      $('#products').scrollIntoView({ behavior: 'smooth' });
     },
   },
     h('span', { class: 'ico', text: c.icon || '' }),
@@ -207,143 +242,145 @@ function setCat(key) {
   renderProducts();
 }
 
-function matchesQuery(p) {
-  const q = query.toLowerCase();
-  return (p.name || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
-}
+/* ---------- məhsullar ---------- */
 
 function renderProducts() {
   if (!CATALOG) return;
   const d = L();
-  const box = $('#productBox');
   const all = CATALOG.products || [];
+  const grid = $('#productGrid');
 
   if (!all.length) {
     setText('#prodCount', '');
-    box.replaceChildren(h('div', { class: 'empty', text: d.noProducts }));
+    grid.replaceChildren(h('div', { class: 'empty', text: d.noProducts }));
     return;
   }
 
-  const list = all.filter((p) => (!activeCat || p.category === activeCat) && (!query || matchesQuery(p)));
+  const q = query.toLowerCase();
+  const list = all.filter((p) =>
+    (!activeCat || p.category === activeCat) && (!q || (p.name || '').toLowerCase().includes(q)));
+
   setText('#prodCount', list.length ? String(list.length) : '');
-
-  if (!list.length) {
-    box.replaceChildren(h('div', { class: 'empty', text: d.noResults }));
-    return;
-  }
-  box.replaceChildren(h('div', { class: 'product-grid' }, ...list.map(productCard)));
+  grid.replaceChildren(...(list.length ? list.map(productCard) : [h('div', { class: 'empty', text: d.noResults })]));
 }
 
 function productCard(p) {
   const d = L();
-  const catName = (CATALOG.categories || []).find((c) => c.key === p.category)?.name;
+  const plans = (p.prices || []).filter((x) => MONTHS.includes(x.months) && x.current_price > 0);
   const img = safeUrl(p.image_url);
-  const prices = (p.prices || []).filter((x) => ALLOWED_MONTHS.includes(x.months) && x.current_price > 0);
-  const hasPrices = prices.length > 0;
+  const catName = (CATALOG.categories || []).find((c) => c.key === p.category)?.name;
 
-  const thumb = h('div', { class: 'p-thumb' }, img
-    ? h('img', {
-        src: img,
-        alt: p.name || '',
-        loading: 'lazy',
-        onerror: (e) => e.currentTarget.replaceWith(h('span', { class: 'mono', text: initial(p.name) })),
-      })
-    : h('span', { class: 'mono', text: initial(p.name) }));
+  let sel = picked.get(p.key);
+  if (!plans.some((x) => x.months === sel)) sel = plans[0]?.months;
+  picked.set(p.key, sel);
+  const cur = plans.find((x) => x.months === sel);
 
-  const priceList = hasPrices
-    ? h('div', { class: 'p-plans' }, ...prices.map((x) => h('div', { class: 'p-plan' },
-        h('span', { text: monthsLabel(x.months) }),
-        x.sale_price
-          ? h('span', null,
-              h('s', { text: money(x.price) }),
-              h('b', { class: 'p-sale', text: money(x.sale_price) }),
-              h('span', { class: 'p-off', text: `-${Math.round((1 - x.sale_price / x.price) * 100)}%` }))
-          : h('b', { text: money(x.price) }),
-      )))
-    : h('div', { class: 'p-nop', text: d.noPrice });
-
-  const select = hasPrices
-    ? h('select', { 'aria-label': d.selectPlan, class: 'p-select' },
-        ...prices.map((x) => h('option', { value: x.months, text: `${monthsLabel(x.months)} — ${money(x.current_price)}` })))
+  const chips = plans.length > 1
+    ? h('div', { class: 'chips' }, ...plans.map((x) => h('button', {
+        type: 'button',
+        class: x.months === sel ? 'chip on' : 'chip',
+        onclick: () => { picked.set(p.key, x.months); renderProducts(); },
+      }, monthsLabel(x.months))))
     : null;
 
-  const actions = h('div', { class: 'p-actions' },
-    hasPrices ? h('button', { class: 'btn btn-primary', type: 'button', text: d.order, onclick: () => orderNow(p, Number(select.value)) }) : null,
-    hasPrices ? h('button', { class: 'btn btn-ghost', type: 'button', text: d.add, onclick: () => addItem(p, Number(select.value)) }) : null,
-    h('a', { class: 'btn btn-ghost btn-block', href: `product.html?product=${encodeURIComponent(p.key)}`, text: d.details }),
-  );
+  const price = cur
+    ? h('div', { class: 'p-price' },
+        cur.sale_price ? h('s', { text: money(cur.price) }) : null,
+        h('b', { text: money(cur.current_price) }))
+    : h('div', { class: 'p-nop', text: d.noPrice });
+
+  const actions = cur
+    ? h('div', { class: 'p-actions' },
+        h('button', { class: 'btn btn-primary btn-block', type: 'button', text: d.add, onclick: () => addItem(p, sel) }),
+        h('a', { class: 'btn btn-ghost btn-block', href: `product.html?product=${encodeURIComponent(p.key)}`, text: d.details }))
+    : null;
 
   return h('article', { class: 'p-card' },
-    thumb,
+    h('div', { class: 'p-img' }, img
+      ? h('img', {
+          src: img,
+          alt: p.name || '',
+          loading: 'lazy',
+          onerror: (e) => e.currentTarget.replaceWith(h('span', { class: 'mono', text: initial(p.name) })),
+        })
+      : h('span', { class: 'mono', text: initial(p.name) })),
     catName ? h('span', { class: 'p-cat', text: catName }) : null,
     h('h3', { class: 'p-name', text: p.name || '' }),
-    p.description ? h('p', { class: 'p-desc', text: p.description }) : null,
-    priceList,
-    select ? h('label', { class: 'p-label' }, h('span', { text: d.selectPlan }), select) : null,
+    chips,
+    price,
     actions,
   );
 }
 
+/* ---------- səbət ---------- */
+
 function addItem(p, months) {
   const d = L();
-  const option = (p.prices || []).find((x) => x.months === months);
-  if (!option) return;
+  const opt = (p.prices || []).find((x) => x.months === months);
+  if (!opt) return;
 
   const found = cart.find((i) => i.key === p.key && i.months === months);
   if (found) {
     found.quantity = Math.min(10, found.quantity + 1);
   } else {
     if (cart.length >= MAX_ITEMS) return toast(d.cartFull, false);
-    cart.push({ key: p.key, name: p.name, months, quantity: 1, price: option.current_price });
+    cart.push({ key: p.key, name: p.name, months, quantity: 1, price: opt.current_price });
   }
-  saveCart();
-  updateCartCount();
-  renderCart();
+  afterCartChange();
   toast(d.added);
 }
 
-function orderNow(p, months) {
-  addItem(p, months);
-  openCart(true);
+function changeQty(idx, delta) {
+  const it = cart[idx];
+  if (!it) return;
+  it.quantity = Math.min(10, Math.max(1, it.quantity + delta));
+  afterCartChange();
+}
+
+function removeItem(idx) {
+  cart.splice(idx, 1);
+  afterCartChange();
+}
+
+function afterCartChange() {
+  saveCart();
+  renderCart();
+  updateCount();
 }
 
 function renderCart() {
   const d = L();
-  const list = $('#cartList');
-  if (list) {
-    list.replaceChildren(...(cart.length
-      ? cart.map((i, idx) => h('div', { class: 'cart-item' },
-          h('div', null,
-            h('div', { class: 'nm', text: i.name }),
-            h('div', { class: 'pr', text: `${monthsLabel(i.months)} · ${d.qty}: ${i.quantity} · ${money(i.price * i.quantity)}` })),
-          h('button', {
-            type: 'button',
-            text: d.remove,
-            onclick: () => { cart.splice(idx, 1); saveCart(); renderCart(); updateCartCount(); },
-          })))
-      : [h('p', { class: 'muted', text: d.cartEmpty })]));
-  }
+  const items = cart.length
+    ? cart.map((i, idx) => h('div', { class: 'cart-item' },
+        h('div', { class: 'ci-info' },
+          h('div', { class: 'nm', text: i.name }),
+          h('div', { class: 'pr', text: `${monthsLabel(i.months)} · ${money(i.price * i.quantity)}` })),
+        h('div', { class: 'qty' },
+          h('button', { type: 'button', 'aria-label': '−', onclick: () => changeQty(idx, -1), text: '−' }),
+          h('span', { text: String(i.quantity) }),
+          h('button', { type: 'button', 'aria-label': '+', onclick: () => changeQty(idx, 1), text: '+' })),
+        h('button', { class: 'ci-del', type: 'button', 'aria-label': d.remove, onclick: () => removeItem(idx), text: '✕' })))
+    : [h('p', { class: 'muted', text: d.empty })];
+
+  $('#cartList').replaceChildren(...items);
   setText('#cartTotal', money(cart.reduce((s, i) => s + i.price * i.quantity, 0)));
 }
 
-function updateCartCount() {
-  setText('#cartCount', String(cart.reduce((s, i) => s + i.quantity, 0)));
+function updateCount() {
+  const n = String(cart.reduce((s, i) => s + i.quantity, 0));
+  setText('#cartCount', n);
+  setText('#bnCount', n);
 }
 
 function openCart(open) {
-  const drawer = $('#cartDrawer');
-  const scrim = $('#scrim');
-  if (drawer) drawer.hidden = !open;
-  if (scrim) scrim.hidden = !open;
-  if (open) {
-    renderCart();
-    $('#cartClose')?.focus();
-  }
+  document.body.classList.toggle('cart-open', open);
+  if (open) $('#scrim').hidden = false;
+  else if (!$('#pageDrawer').hidden === false) $('#scrim').hidden = true;
 }
 
 async function checkout() {
   const d = L();
-  if (!cart.length) return toast(d.cartEmpty, false);
+  if (!cart.length) return toast(d.empty, false);
 
   const tk = await token();
   if (!tk) {
@@ -362,10 +399,8 @@ async function checkout() {
       },
     });
     cart = [];
-    saveCart();
-    renderCart();
-    updateCartCount();
-    openCart(false);
+    afterCartChange();
+    closeAll();
     toast(`${d.ordered} · ${money(order.total)}`);
     setTimeout(() => { location.href = 'profile.html'; }, 1200);
   } catch (e) {
@@ -373,11 +408,30 @@ async function checkout() {
   }
 }
 
+/* ---------- məlumat səhifələri (Haqqımızda, Şərtlər, Məxfilik) ---------- */
+
+function showPage(key) {
+  const d = L();
+  const titles = { about_text: d.about, terms_text: d.terms, privacy_text: d.privacy };
+  const text = (CATALOG?.content || {})[key] || '';
+  setText('#pageTitle', titles[key] || d.info);
+  $('#pageBody').replaceChildren(h('p', { text: text || d.noText }));
+  $('#pageDrawer').hidden = false;
+  $('#scrim').hidden = false;
+}
+
+function closeAll() {
+  document.body.classList.remove('cart-open');
+  $('#pageDrawer').hidden = true;
+  $('#scrim').hidden = true;
+}
+
+/* ---------- rəylər, FAQ, footer ---------- */
+
 function renderReviews() {
   const list = CATALOG.reviews || [];
-  const section = $('#reviews');
-  if (section) section.hidden = list.length === 0;
-  $('#reviewGrid')?.replaceChildren(...list.map((r) => {
+  $('#reviews').hidden = list.length === 0;
+  $('#reviewGrid').replaceChildren(...list.map((r) => {
     const n = Math.max(0, Math.min(5, Number(r.rating) || 0));
     return h('article', { class: 'review' },
       h('div', { class: 'stars', text: '★'.repeat(n) + '☆'.repeat(5 - n) }),
@@ -388,9 +442,8 @@ function renderReviews() {
 
 function renderFaq() {
   const list = (CATALOG.faqs || []).filter((f) => !f.product_key);
-  const section = $('#faq');
-  if (section) section.hidden = list.length === 0;
-  $('#faqList')?.replaceChildren(...list.map((f) => h('details', null,
+  $('#faq').hidden = list.length === 0;
+  $('#faqList').replaceChildren(...list.map((f) => h('details', null,
     h('summary', { text: f.question || '' }),
     h('p', { text: f.answer || '' }))));
 }
@@ -405,24 +458,34 @@ function renderFooter() {
   setText('#year', String(new Date().getFullYear()));
 
   const digits = String(s.whatsapp || '').replace(/\D/g, '');
-  const wa = $('#waFab');
-  if (wa) {
-    wa.hidden = !digits;
-    if (digits) wa.href = `https://wa.me/${digits}`;
+  const link = digits ? `https://wa.me/${digits}` : '';
+  for (const sel of ['#waFloat', '#footWa']) {
+    const el = $(sel);
+    if (!el) continue;
+    el.hidden = !digits;
+    if (digits) el.href = link;
   }
 }
 
+/* ---------- hesab ---------- */
+
 async function setupAuth() {
   const d = L();
-  const tk = await token();
-  const btn = $('#accountBtn');
-  if (!btn) return;
-  btn.textContent = tk ? d.profile : d.login;
-  btn.href = tk ? 'profile.html' : 'login.html';
+  const logged = !!(await token());
+  const acc = $('#accountBtn');
+  if (acc) {
+    acc.textContent = logged ? d.profile : d.login;
+    acc.href = logged ? 'profile.html' : 'login.html';
+  }
+  const bp = $('#bnProfile');
+  if (bp) bp.href = logged ? 'profile.html' : 'login.html';
+  setText('#bnProfileT', logged ? d.profile : d.login);
 }
 
-$('#searchForm')?.addEventListener('submit', (e) => e.preventDefault());
-$('#search')?.addEventListener('input', (e) => {
+/* ---------- hadisələr ---------- */
+
+$('#searchForm').addEventListener('submit', (e) => e.preventDefault());
+$('#search').addEventListener('input', (e) => {
   query = e.target.value.trim();
   renderProducts();
 });
@@ -430,24 +493,30 @@ $('#search')?.addEventListener('input', (e) => {
 document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
   setLang(b.dataset.lang);
   markLang();
+  applyStatic();
   load(true);
   setupAuth();
 }));
 
-$('#cartBtn')?.addEventListener('click', () => openCart(true));
-$('#cartClose')?.addEventListener('click', () => openCart(false));
-$('#scrim')?.addEventListener('click', () => openCart(false));
-$('#checkoutBtn')?.addEventListener('click', checkout);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') openCart(false); });
+$('#bnCart').addEventListener('click', () => openCart(true));
+$('#cartClose').addEventListener('click', closeAll);
+$('#checkoutBtn').addEventListener('click', checkout);
+$('#pageClose').addEventListener('click', closeAll);
+$('#scrim').addEventListener('click', closeAll);
+document.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+
+/* ---------- başlanğıc ---------- */
 
 function init() {
   markLang();
   applyStatic();
-  $('#productBox').replaceChildren(h('p', { class: 'muted', text: L().loading }));
+  $('#productGrid').replaceChildren(h('p', { class: 'muted', text: L().loading }));
   renderCart();
-  updateCartCount();
+  updateCount();
   load(true);
   setupAuth();
+  restartSlides();
   sb().then((client) => client.auth.onAuthStateChange(() => setupAuth())).catch(() => {});
 
   setInterval(() => {
