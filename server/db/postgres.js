@@ -2,24 +2,20 @@ import pg from 'pg';
 import { HttpError } from '../http.js';
 
 /*
- * ===================== NEON / POSTGRESQL QATI =====================
- * Bütün verilənlər bazası əməliyyatı bu faylda toplanır.
- * Başqa PostgreSQL-ə (Neon, Supabase DB, öz serveriniz) keçmək üçün
- * yalnız DATABASE_URL dəyişir. Kod eyni qalır.
- * ================================================================
+ * Bağlantı yalnız ilk sorğuda yaradılır. DATABASE_URL yoxdursa modul yüklənmir,
+ * yalnız DB sorğusu 500 verir və /api/health kimi marşrutlar işləməyə davam edir.
  */
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error('DATABASE_URL təyin edilməlidir (Neon connection string).');
+let pool = globalThis.__digibakuPool ?? null;
 
-// Serverless mühitdə hovuzu isti instansiyalarda təkrar istifadə edirik
-const pool = globalThis.__digibakuPool ?? new pg.Pool({
-  connectionString: url,
-  max: 5,
-  ssl: { rejectUnauthorized: true },
-});
-globalThis.__digibakuPool = pool;
+function getPool() {
+  if (pool) return pool;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new HttpError(500, 'database_not_configured');
+  pool = new pg.Pool({ connectionString: url, max: 5, ssl: { rejectUnauthorized: true } });
+  globalThis.__digibakuPool = pool;
+  return pool;
+}
 
-// SQL identifikatorları yalnız bu nümunəyə uyğun ola bilər (SQL injection-a qarşı)
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 const ident = (name) => {
   if (!IDENT.test(name)) throw new Error(`Yanlış identifikator: ${name}`);
@@ -28,14 +24,13 @@ const ident = (name) => {
 const columns = (select) =>
   !select || select === '*' ? '*' : select.split(',').map((c) => ident(c.trim())).join(', ');
 
-// Obyekt və massivlər JSON kimi yazılır (jsonb sütunları üçün)
 const norm = (v) => (v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v);
 
 const PG_STATUS = { '23505': 409, '23503': 400, '23514': 400, '22P02': 400, '22007': 400, '22001': 400 };
 
 async function run(text, params = []) {
   try {
-    return await pool.query(text, params);
+    return await getPool().query(text, params);
   } catch (error) {
     if (error.code) throw new HttpError(PG_STATUS[error.code] || 500, error.message);
     throw error;
@@ -54,7 +49,6 @@ function where(eq = {}, offset = 0) {
 }
 
 export const db = {
-  pool,
   query: run,
 
   async list(table, { select = '*', eq, order, ascending = true, limit } = {}) {
