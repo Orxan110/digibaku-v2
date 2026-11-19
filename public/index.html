@@ -22,7 +22,9 @@
   </nav>
   <div class="top-actions">
     <div class="langs" role="group" aria-label="Language">
-      <button data-lang="az">AZ</button><button data-lang="ru">RU</button><button data-lang="en">EN</button>
+      <button data-lang="az">AZ</button>
+      <button data-lang="ru">RU</button>
+      <button data-lang="en">EN</button>
     </div>
     <a class="chip" href="/chat.html" data-i18n="chat">Çat</a>
     <a class="chip chip-solid" href="/login.html" data-i18n="account">Hesab</a>
@@ -32,18 +34,25 @@
 <main id="app">
   <section class="state" id="loading">
     <div class="skeleton skeleton-hero"></div>
-    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="skeleton-row">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+    </div>
   </section>
+
   <section class="state state-error" id="failed" hidden>
     <p data-i18n="loadError">Məlumat yüklənə bilmədi.</p>
     <button class="chip chip-solid" id="retry" data-i18n="retry">Yenidən cəhd et</button>
   </section>
+
   <div id="content" hidden></div>
 </main>
 
 <footer class="footer" id="footer"></footer>
 <a class="wa-float" id="waFloat" hidden target="_blank" rel="noopener" aria-label="WhatsApp">WhatsApp</a>
 
-<script src="/js/store.js" type="module"></script>
+<script src="/jss/store.js" type="module"></script>
 </body>
 </html>
