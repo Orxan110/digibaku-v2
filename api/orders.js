@@ -1,4 +1,4 @@
-const { pool, getSessionInfo } = require("./_db");
+const { pool, getUserId } = require("./_db");
 
 const MONTHS = [1, 2, 3, 6, 12];
 
@@ -10,11 +10,8 @@ function body(req) {
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const info = await getSessionInfo(req);
-  const userId = info.userId;
-  if (!userId) {
-    return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun.", debug: info });
-  }
+  const userId = await getUserId(req);
+  if (!userId) return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun." });
 
   if (req.method === "GET") {
     const r = await pool.query(
