@@ -9,9 +9,12 @@ import { authConfig } from '../services/supabase.js';
 
 export const publicRouter = Router();
 
-/** Brauzerin lazım olan yalnız ictimai konfiqurasiyası (service-role heç vaxt göndərilmir) */
-publicRouter.get('/config', (req, res) => res.json(authConfig()));
+/* Brauzer üçün yalnız ictimai Supabase konfiqurasiyası (anon açarı). Service-role heç vaxt göndərilmir. */
+publicRouter.get('/config', (req, res) => {
+  res.json(authConfig());
+});
 
+/* Bütün sayt məzmunu (kateqoriyalar, məhsullar, qiymətlər, bannerlər, rəylər, FAQ) */
 publicRouter.get('/catalog', wrap(async (req, res) => {
   const lang = normLang(req.query.lang);
   let data = getCached(lang);
@@ -23,7 +26,7 @@ publicRouter.get('/catalog', wrap(async (req, res) => {
   res.json(data);
 }));
 
-/** Müştəri rəy göndərir → admin təsdiqləyənə qədər "pending" qalır */
+/* Müştəri rəy göndərir. Admin təsdiqləyənə qədər "pending" qalır. */
 publicRouter.post('/reviews', requireCustomer, wrap(async (req, res) => {
   const b = req.body || {};
   const rating = Number(b.rating);
