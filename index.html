@@ -3,44 +3,57 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ana səhifə — DigiBaku</title>
-<meta name="description" content="DigiBaku — premium rəqəmsal xidmətlər">
+<title>DigiBaku — Premium rəqəmsal xidmətlər</title>
+<meta name="description" content="DigiBaku — Netflix, YouTube Premium, ChatGPT, Spotify və digər premium xidmətlər sərfəli qiymətlə.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <div id="site-header"></div>
+
 <main class="wrap">
 
-<div class="banner">
-  <h1>Premium rəqəmsal xidmətlər, <em>sərfəli qiymətə</em></h1>
-  <p>Netflix, YouTube Premium, ChatGPT, Spotify və digər xidmətlər — bir yerdə.</p>
-  <a class="btn gold" href="products.html">Məhsullara bax</a>
-</div>
-<section>
-  <h2>Kateqoriyalar</h2>
-  <div class="cats" id="homeCats"><div class="empty">Yüklənir...</div></div>
-</section>
-<section>
-  <h2>DigiBaku-nun üstünlükləri</h2>
-  <div class="features">
-    <div class="feat"><b>Sürətli çatdırılma</b>Sifarişiniz təsdiqləndikdən sonra hazırlanır.</div>
-    <div class="feat"><b>Şəffaf qiymət</b>Qiymət səbətdə və sifarişdə eyni olur.</div>
-    <div class="feat"><b>Dəstək</b>WhatsApp və chat vasitəsilə əlaqə saxlayın.</div>
+  <div class="banner">
+    <h1 id="heroTitle">Premium rəqəmsal xidmətlər, <em>sərfəli qiymətə</em></h1>
+    <p id="heroSub">Netflix, YouTube Premium, ChatGPT, Spotify və digər xidmətlər — bir yerdə.</p>
+    <a class="btn gold" id="heroBtn" href="#products">Məhsullara bax</a>
   </div>
-</section>
-<section>
-  <h2>Müştəri rəyləri</h2>
-  <div class="empty">Rəylər admin paneldən əlavə olunacaq.</div>
-</section>
+
+  <section id="products">
+    <h2 id="prodTitle">Məhsullar</h2>
+    <p class="muted" id="prodSub" style="margin:-8px 0 14px">Premium rəqəmsal xidmətlərimizi kəşf edin.</p>
+
+    <div class="filters" id="filters" role="tablist" aria-label="Kateqoriyalar"></div>
+
+    <div class="grid" id="productGrid">
+      <div class="empty" id="loadingMsg">Yüklənir...</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="whyTitle">DigiBaku-nun üstünlükləri</h2>
+    <div class="features">
+      <div class="feat"><b id="f1t">Sürətli çatdırılma</b><span id="f1d" class="muted">Sifarişiniz təsdiqləndikdən sonra hazırlanır.</span></div>
+      <div class="feat"><b id="f2t">Şəffaf qiymət</b><span id="f2d" class="muted">Qiymət səbətdə və sifarişdə eyni olur.</span></div>
+      <div class="feat"><b id="f3t">Dəstək</b><span id="f3d" class="muted">WhatsApp və chat vasitəsilə əlaqə saxlayın.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="revTitle">Müştəri rəyləri</h2>
+    <div class="empty" id="revEmpty">Rəylər tezliklə əlavə olunacaq.</div>
+  </section>
 
 </main>
+
 <footer class="wrap">
   <a href="about.html">Haqqımızda</a><a href="faq.html">FAQ</a><a href="contact.html">Əlaqə</a>
   <a href="rules.html">Sifariş və xidmət qaydaları</a><a href="privacy.html">Məxfilik siyasəti</a><a href="terms.html">İstifadə şərtləri</a>
   <p style="margin-top:10px">© DigiBaku</p>
 </footer>
+
 <div id="fabs"></div>
 <nav id="bottom-nav"></nav>
+
 <script src="assets/auth.js"></script>
 <script src="assets/api.js"></script>
 <script src="assets/app.js"></script>
