@@ -140,6 +140,7 @@ function markLang() {
 }
 
 function renderHero() {
+  if (!CATALOG) return;
   const c = CATALOG.content || {};
   const d = L();
   setText('#heroTitle', c.hero_title || d.heroTitle);
@@ -170,6 +171,7 @@ function renderHero() {
 }
 
 function renderCats() {
+  if (!CATALOG) return;
   const d = L();
   const cats = CATALOG.categories || [];
   const counts = {};
@@ -211,6 +213,7 @@ function matchesQuery(p) {
 }
 
 function renderProducts() {
+  if (!CATALOG) return;
   const d = L();
   const box = $('#productBox');
   const all = CATALOG.products || [];
