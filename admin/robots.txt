@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /gizli_panel.html
-Disallow: /profile.html
-Disallow: /chat.html
-
-Sitemap: https://YOUR-DOMAIN/sitemap.xml
