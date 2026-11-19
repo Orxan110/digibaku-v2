@@ -1,40 +1,82 @@
+Versel 
+
 {
-  "cleanUrls": true,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=()"
-        },
-        {
-          "key": "Strict-Transport-Security",
-          "value": "max-age=31536000; includeSubDomains"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://esm.sh https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/auth/:path*",
-      "destination": "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth/:path*"
-    }
-  ]
+
+"cleanUrls": true,
+
+"headers": [
+
+{
+
+"source": "/(.)",
+
+"headers": [
+
+{
+
+"key": "X-Content-Type-Options",
+
+"value": "nosniff"
+
+},
+
+{
+
+"key": "X-Frame-Options",
+
+"value": "SAMEORIGIN"
+
+},
+
+{
+
+"key": "Referrer-Policy",
+
+"value": "strict-origin-when-cross-origin"
+
+},
+
+{
+
+"key": "Permissions-Policy",
+
+"value": "camera=(), microphone=(), geolocation=()"
+
+},
+
+{
+
+"key": "Strict-Transport-Security",
+
+"value": "max-age=31536000; includeSubDomains"
+
+},
+
+{
+
+"key": "Content-Security-Policy",
+
+"value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+
 }
+
+ ]
+
+}
+
+],
+
+"rewrites": [
+
+{
+
+"source": "/api/auth/:path",
+
+"destination": "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth/:path*"
+
+}
+
+]
+
+}
+
