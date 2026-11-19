@@ -446,3 +446,47 @@ const ENTITIES = {
     fields: [
       { k: 'author_name', l: 'Müəllif *', t: 'text', req: true }, { k: 'rating', l: 'Ulduz (1–5)', t: 'number' },
       { k: 'review_date', l: 'Tarix
+/* ---------- Mesajlar (çat) ---------- */
+function stopPoll() { clearInterval(S.pollTimer); S.pollTimer = null; }
+
+async function renderMessages() {
+  $('#view').innerHTML = `<div class="chat">
+    <div class="threads" id="threads"><p class="muted" style="padding:12px">Yüklənir…</p></div>
+    <div class="convo"><div class="bubbles" id="bubbles"><p class="muted">Söhbət seçin.</p></div>
+      <div class="reply" id="replyBox" hidden><textarea id="replyTxt" placeholder="Cavab yazın…"></textarea><button class="btn" id="sendR">Göndər</button></div>
+    </div></div>`;
+  $('#sendR').addEventListener('click', sendReply);
+  $('#replyTxt').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); }
+  });
+  await loadThreads();
+  S.pollTimer = setInterval(() => {
+    if (S.section !== 'messages') return stopPoll();
+    loadThreads();
+    if (S.thread) loadThread(S.thread, true);
+  }, 15000);
+}
+
+async function loadThreads() {
+  const list = await api('/threads');
+  const box = $('#threads');
+  if (!box) return;
+  box.innerHTML = list.length ? list.map((t) => {
+    const name = t.profile?.full_name || t.profile?.email || String(t.user_id).slice(0, 8);
+    return `<button class="thread ${S.thread === t.user_id ? 'on' : ''}" data-u="${esc(t.user_id)}">
+      <div class="t1"><span>${esc(name)}</span>${t.unread ? `<span class="badge">${t.unread}</span>` : ''}</div>
+      <div class="t2">${t.last_sender === 'admin' ? 'Siz: ' : ''}${esc(t.last_message)}</div></button>`;
+  }).join('') : '<p class="muted" style="padding:12px">Mesaj yoxdur.</p>';
+  box.querySelectorAll('[data-u]').forEach((b) => b.addEventListener('click', () => {
+    S.thread = b.dataset.u;
+    loadThread(S.thread);
+    loadThreads();
+  }));
+}
+
+async function loadThread(userId, silent = false) {
+  const msgs = await api(`/threads/${encodeURIComponent(userId)}`);
+  const box = $('#bubbles');
+  if (!box) return;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = msgs.map((m) => `<div class="
