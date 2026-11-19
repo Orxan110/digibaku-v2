@@ -1,21 +1,24 @@
 {
-  "name": "digibaku-v2",
-  "version": "3.0.0",
-  "private": true,
-  "type": "module",
-  "description": "DigiBaku — rəqəmsal mağaza (Neon + Supabase Auth + Vercel)",
-  "engines": { "node": ">=20" },
-  "scripts": {
-    "dev": "node --env-file=.env server/index.js",
-    "start": "node server/index.js",
-    "test": "node --test tests/pricing.test.mjs",
-    "grant-admin": "node --env-file=.env scripts/grant-admin.mjs",
-    "migrate": "node --env-file=.env scripts/migrate-from-supabase.mjs",
-    "migrate:apply": "node --env-file=.env scripts/migrate-from-supabase.mjs --apply"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "express": "^4.21.0",
-    "pg": "^8.13.0"
-  }
+"name": "digibaku-v2",
+"version": "3.0.0",
+"private": true,
+"type": "module",
+"description": "DigiBaku — rəqəmsal mağaza (Neon + Neon Auth + Vercel)",
+"engines": { "node": ">=20" },
+"scripts": {
+"dev": "node --env-file=.env server/index.js",
+"start": "node server/index.js",
+"test": "node --test tests/pricing.test.mjs",
+"grant-admin": "node --env-file=.env scripts/grant-admin.mjs",
+"migrate": "node --env-file=.env scripts/migrate-from-supabase.mjs",
+"migrate:apply": "node --env-file=.env scripts/migrate-from-supabase.mjs --apply"
+},
+"dependencies": {
+"@neondatabase/neon-js": "latest",
+"@supabase/supabase-js": "^2.45.0",
+"express": "^4.21.0",
+"pg": "^8.13.0"
 }
+}
+
+
