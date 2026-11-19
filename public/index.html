@@ -3,56 +3,128 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DigiBaku — Rəqəmsal abunəliklər</title>
-<meta name="description" content="Netflix, YouTube Premium, ChatGPT, Spotify və digər rəqəmsal abunəliklər — DigiBaku.">
+<title>DigiBaku — Premium rəqəmsal xidmətlər</title>
+<meta name="description" content="DigiBaku — Netflix, YouTube Premium, ChatGPT, Spotify və digər premium rəqəmsal abunəliklər.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://digibaku.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DigiBaku">
+<meta property="og:title" content="DigiBaku — Premium rəqəmsal xidmətlər">
+<meta property="og:description" content="Netflix, YouTube Premium, ChatGPT və digər premium abunəliklər.">
 <link rel="icon" href="/assets/img/netflix.webp">
-<link rel="stylesheet" href="/css/store.css">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/home.css">
 </head>
 <body>
-<header class="topbar" id="top">
-  <a class="brand" href="/" aria-label="DigiBaku">
-    <span class="brand-mark">D</span><span class="brand-name">DigiBaku</span>
-  </a>
-  <nav class="nav" id="nav">
-    <a href="#categories" data-i18n="navCategories">Kateqoriyalar</a>
-    <a href="#products" data-i18n="navProducts">Məhsullar</a>
-    <a href="#reviews" data-i18n="navReviews">Rəylər</a>
-    <a href="#faq" data-i18n="navFaq">FAQ</a>
-    <a href="qiymetler.html" data-i18n="navPrices">Qiymətlər</a>
-  </nav>
-  <div class="top-actions">
-    <div class="langs" role="group" aria-label="Language">
-      <button data-lang="az">AZ</button>
-      <button data-lang="ru">RU</button>
-      <button data-lang="en">EN</button>
+
+<a class="skip" href="#main">Əsas məzmuna keç</a>
+
+<header class="site-header">
+  <div class="container bar">
+    <a class="brand" href="index.html" aria-label="DigiBaku ana səhifə">
+      <span class="brand-mark">D</span><span class="brand-name">DigiBaku<b>.com</b></span>
+    </a>
+
+    <form class="search" id="searchForm" role="search">
+      <input id="search" type="search" maxlength="80" autocomplete="off" aria-label="Məhsul axtar" placeholder="Məhsul axtar…">
+    </form>
+
+    <div class="bar-actions">
+      <div class="langs" role="group" aria-label="Dil">
+        <button type="button" data-lang="az">AZ</button>
+        <button type="button" data-lang="ru">RU</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <button class="btn btn-ghost" id="cartBtn" type="button">Səbət <span class="badge" id="cartCount">0</span></button>
+      <a class="btn btn-primary" id="accountBtn" href="login.html">Daxil ol</a>
     </div>
-    <a class="chip" href="/chat.html" data-i18n="chat">Çat</a>
-    <a class="chip chip-solid" href="/login.html" data-i18n="account">Hesab</a>
   </div>
+
+  <nav class="cats-nav container" id="catNav" aria-label="Kateqoriyalar"></nav>
 </header>
 
-<main id="app">
-  <section class="state" id="loading">
-    <div class="skeleton skeleton-hero"></div>
-    <div class="skeleton-row">
-      <div class="skeleton"></div>
-      <div class="skeleton"></div>
-      <div class="skeleton"></div>
-      <div class="skeleton"></div>
+<main id="main">
+
+  <section class="container hero-wrap">
+    <div class="hero card">
+      <div class="hero-text">
+        <span class="tag" id="heroTag">DigiBaku</span>
+        <h1 id="heroTitle">Premium rəqəmsal xidmətlər</h1>
+        <p class="muted" id="heroSub">Netflix, YouTube Premium, ChatGPT və digər abunəliklər bir platformada.</p>
+        <a class="btn btn-primary" id="heroCta" href="#products">Məhsullara bax</a>
+      </div>
+      <img class="hero-img" id="heroImg" alt="" hidden>
     </div>
+    <div class="hero-promos" id="promos" hidden></div>
   </section>
 
-  <section class="state state-error" id="failed" hidden>
-    <p data-i18n="loadError">Məlumat yüklənə bilmədi.</p>
-    <button class="chip chip-solid" id="retry" data-i18n="retry">Yenidən cəhd et</button>
+  <section class="section container">
+    <div class="section-head"><h2 id="catTitle">Kateqoriyalar</h2></div>
+    <div class="cat-grid" id="catGrid"></div>
   </section>
 
-  <div id="content" hidden></div>
+  <section class="section container" id="products">
+    <div class="section-head">
+      <h2 id="prodTitle">Məhsullar</h2>
+      <span class="muted" id="prodCount"></span>
+    </div>
+    <div class="product-box" id="productBox"><p class="muted">Yüklənir…</p></div>
+  </section>
+
+  <section class="section container" id="reviews" hidden>
+    <div class="section-head"><h2 id="revTitle">Müştəri rəyləri</h2></div>
+    <div class="review-grid" id="reviewGrid"></div>
+  </section>
+
+  <section class="section container" id="faq" hidden>
+    <div class="section-head"><h2 id="faqTitle">Tez-tez verilən suallar</h2></div>
+    <div id="faqList"></div>
+  </section>
+
 </main>
 
-<footer class="footer" id="footer"></footer>
-<a class="wa-float" id="waFloat" hidden target="_blank" rel="noopener" aria-label="WhatsApp">WhatsApp</a>
+<footer class="site-footer">
+  <div class="container foot-grid">
+    <div>
+      <a class="brand" href="index.html">
+        <span class="brand-mark">D</span><span class="brand-name">DigiBaku<b>.com</b></span>
+      </a>
+      <p class="muted" id="footText"></p>
+    </div>
+    <div>
+      <h3 id="footLinksTitle">Keçidlər</h3>
+      <a href="qiymetler.html" id="footPrices">Qiymətlər</a>
+      <a href="faq.html">FAQ</a>
+      <a href="chat.html" id="footChat">Çat</a>
+      <a href="login.html" id="footAccount">Hesab</a>
+    </div>
+    <div>
+      <h3 id="footContactTitle">Əlaqə</h3>
+      <p id="footEmail"></p>
+      <p id="footPhone"></p>
+      <p id="footAddress"></p>
+    </div>
+  </div>
+  <div class="container copy">© <span id="year"></span> DigiBaku.com</div>
+</footer>
 
-<script src="/jss/store.js" type="module"></script>
+<aside class="drawer" id="cartDrawer" hidden aria-label="Səbət">
+  <div class="drawer-head">
+    <h2 id="cartTitle">Səbət</h2>
+    <button class="icon-btn" id="cartClose" type="button" aria-label="Bağla">✕</button>
+  </div>
+  <div class="cart-list" id="cartList"></div>
+  <div class="drawer-foot">
+    <div class="row"><span id="cartTotalLabel">Ümumi</span><b id="cartTotal">0.00 AZN</b></div>
+    <button class="btn btn-primary btn-block" id="checkoutBtn" type="button">Sifarişi təsdiq et</button>
+    <p class="muted small" id="cartNote"></p>
+  </div>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+
+<a class="fab fab-wa" id="waFab" href="#" target="_blank" rel="noopener" hidden aria-label="WhatsApp ilə əlaqə">WhatsApp</a>
+<a class="fab fab-chat" href="chat.html" aria-label="Çat">Çat</a>
+
+<script src="/js/home.js" type="module"></script>
 </body>
 </html>
