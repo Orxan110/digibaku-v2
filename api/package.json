@@ -1,7 +1,0 @@
-{
-  "name": "digibaku-api",
-  "version": "3.0.0",
-  "private": true,
-  "engines": { "node": "22.x" },
-  "dependencies": { "pg": "^8.16.3" }
-}
