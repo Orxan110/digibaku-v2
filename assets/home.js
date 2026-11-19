@@ -33,14 +33,19 @@
       revTitle: "Customer reviews", revEmpty: "Reviews will be added soon." }
   };
 
-  var lang = DB.lang;
-  var t = TX[lang] || TX.az;
+  var lang = (window.DB && DB.lang) || localStorage.getItem("digibaku_lang") || "az";
+  if (!TX[lang]) lang = "az";
+  var t = TX[lang];
   var state = { products: [], categories: [], active: "all" };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+  function showErr(e) {
+    var g = document.getElementById("productGrid");
+    if (g) g.innerHTML = '<div class="empty">Xəta: ' + esc(String((e && e.message) || e)) + "</div>";
   }
   function set(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
 
@@ -120,17 +125,21 @@
   }
 
   async function init() {
-    setStatic();
-    var r = await DBApi.get("/api/products");
-    if (!r.ok) {
-      document.getElementById("productGrid").innerHTML = '<div class="empty">' + esc(t.loadErr) + "</div>";
+    try {
+      setStatic();
+      var r = await DBApi.get("/api/products");
+      if (!r.ok) {
+        document.getElementById("productGrid").innerHTML = '<div class="empty">' + esc(t.loadErr) + "</div>";
+        drawFilters();
+        return;
+      }
+      state.products = r.data.products || [];
+      state.categories = (r.data.categories || []).filter(function (c) { return c.key; });
       drawFilters();
-      return;
+      drawGrid();
+    } catch (e) {
+      showErr(e);
     }
-    state.products = r.data.products || [];
-    state.categories = (r.data.categories || []).filter(function (c) { return c.key; });
-    drawFilters();
-    drawGrid();
   }
 
   document.addEventListener("DOMContentLoaded", init);
