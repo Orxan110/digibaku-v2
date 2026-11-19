@@ -1,56 +1,49 @@
 const { Pool } = require("pg");
-const { createRemoteJWKSet, jwtVerify } = require("jose");
 
 const pool = globalThis.digibakuPool || new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 3,
-  idleTimeoutMillis: 20000,
-  connectionTimeoutMillis: 8000
+
+connectionString: process.env.DATABASE_URL,
+
+ssl: { rejectUnauthorized: false },
+
+max: 3,
+
+idleTimeoutMillis: 20000,
+
+connectionTimeoutMillis: 8000
+
 });
 
 globalThis.digibakuPool = pool;
 
 const AUTH_BASE = process.env.NEON_AUTH_URL ||
-  "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
 
-const JWKS_URL = process.env.NEON_AUTH_JWKS_URL ||
-  AUTH_BASE.replace(/\/$/, "") + "/.well-known/jwks.json";
+"https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
 
-const ISSUER = new URL(AUTH_BASE).origin;
 
-const JWKS = createRemoteJWKSet(new URL(JWKS_URL));
+// Cookie ilə sessiya yoxlanır. Qaytarır: user id (uuid) və ya null.
 
 async function getUserId(req) {
-  try {
-    const authorization = req.headers.authorization || "";
 
-    if (!authorization.toLowerCase().startsWith("bearer ")) {
-      return null;
-    }
+if (!req.headers.cookie) return null;
 
-    const token = authorization.slice(7).trim();
+try {
 
-    if (!token) return null;
+const r = await fetch(AUTH_BASE + "/get-session", {
 
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: ISSUER,
-      algorithms: ["EdDSA"]
-    });
+headers: { cookie: req.headers.cookie }
 
-    if (!payload.sub || typeof payload.sub !== "string") {
-      return null;
-    }
+});
 
-    return payload.sub;
+if (!r.ok) return null;
 
-  } catch (error) {
-    console.error("JWT yoxlama xətası:", error.message);
-    return null;
-  }
+const j = await r.json();
+
+return j && j.user && j.user.id ? j.user.id : null;
+
+} catch (e) { return null; }
+
 }
 
-module.exports = {
-  pool,
-  getUserId
-};
+module.exports = { pool, getUserId };
+
