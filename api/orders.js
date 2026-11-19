@@ -1,4 +1,4 @@
-const { pool, getUserId } = require("./_db");
+const { pool, getSessionInfo } = require("./_db");
 
 const MONTHS = [1, 2, 3, 6, 12];
 
@@ -10,8 +10,11 @@ function body(req) {
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const userId = await getUserId(req);
-  if (!userId) return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun." });
+  const info = await getSessionInfo(req);
+  const userId = info.userId;
+  if (!userId) {
+    return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun.", debug: info });
+  }
 
   if (req.method === "GET") {
     const r = await pool.query(
@@ -25,7 +28,6 @@ module.exports = async function handler(req, res) {
     if (!Array.isArray(input) || input.length === 0 || input.length > 20) {
       return res.status(400).json({ ok: false, error: "Səbət boşdur." });
     }
-    // Qiymətlər YALNIZ serverdə bazadan hesablanır. Client qiymətinə etibar edilmir.
     const keys = [...new Set(input.map(i => String(i.product_key)))];
     const rows = await pool.query(
       `select p.product_key, p.name_az, pp.*
@@ -50,7 +52,6 @@ module.exports = async function handler(req, res) {
       total += unit * qty;
     }
 
-    // Ödəniş yoxdur: sifariş "pending" statusunda yaranır, admin təsdiqləyir.
     const ins = await pool.query(
       `insert into orders (user_id, total, status, items)
        values ($1, $2, 'pending', $3::jsonb)
