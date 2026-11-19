@@ -252,3 +252,150 @@ adminRouter.put('/settings', write, wrap(async (req, res) => {
   await audit(req, 'update', 'site_settings', saved.join(','));
   res.json({ ok: true, saved });
 }));
+adminRouter.get('/orders', read, wrap(async (req, res) => {
+  res.json(await db.list('orders', {
+    eq: { status: req.query.status },
+    order: 'created_at',
+    ascending: false,
+    limit: 300,
+  }));
+}));
+
+adminRouter.patch('/orders/:id/status', write, wrap(async (req, res) => {
+  const status = req.body?.status;
+  if (!ORDER_STATUSES.includes(status)) throw new HttpError(400, 'invalid_status');
+  const [row] = await db.update('orders', { id: req.params.id }, {
+    status,
+    updated_at: new Date().toISOString(),
+  });
+  if (!row) throw new HttpError(404, 'not_found');
+  await audit(req, 'status', 'orders', req.params.id);
+  res.json(row);
+}));
+
+adminRouter.get('/customers', read, wrap(async (req, res) => {
+  const [profiles, orders] = await Promise.all([
+    db.list('profiles', { limit: 2000 }),
+    db.list('orders', { select: 'user_id,total,status', limit: 10000 }),
+  ]);
+  const agg = {};
+  for (const o of orders) {
+    const a = (agg[o.user_id] ??= { orders_count: 0, total_spent: 0 });
+    a.orders_count++;
+    if (o.status !== 'cancelled') a.total_spent += Number(o.total) || 0;
+  }
+  res.json(profiles.map((p) => ({
+    ...p,
+    orders_count: agg[p.id]?.orders_count ?? 0,
+    total_spent: round2(agg[p.id]?.total_spent ?? 0),
+  })));
+}));
+
+adminRouter.get('/customers/:id', read, wrap(async (req, res) => {
+  const [profile, orders] = await Promise.all([
+    db.one('profiles', { id: req.params.id }),
+    db.list('orders', { eq: { user_id: req.params.id }, order: 'created_at', ascending: false, limit: 100 }),
+  ]);
+  if (!profile) throw new HttpError(404, 'not_found');
+  res.json({ profile, orders });
+}));
+
+adminRouter.get('/threads', read, wrap(async (req, res) => {
+  const [msgs, profiles] = await Promise.all([
+    db.list('messages', { order: 'created_at', ascending: false, limit: 3000 }),
+    db.list('profiles', { select: 'id,email,full_name', limit: 5000 }),
+  ]);
+  const names = new Map(profiles.map((p) => [p.id, p]));
+  const threads = new Map();
+  for (const m of msgs) {
+    let t = threads.get(m.user_id);
+    if (!t) {
+      t = {
+        user_id: m.user_id,
+        last_message: m.message,
+        last_at: m.created_at,
+        last_sender: m.sender_role,
+        unread: 0,
+        profile: names.get(m.user_id) ?? null,
+      };
+      threads.set(m.user_id, t);
+    }
+    if (m.sender_role === 'customer' && !m.is_read) t.unread++;
+  }
+  res.json([...threads.values()]);
+}));
+
+adminRouter.get('/threads/:userId', read, wrap(async (req, res) => {
+  res.json(await db.list('messages', {
+    eq: { user_id: req.params.userId },
+    order: 'created_at',
+    ascending: true,
+    limit: 500,
+  }));
+}));
+
+adminRouter.post('/threads/:userId', write, wrap(async (req, res) => {
+  const text = String(req.body?.message || '').trim();
+  if (!text || text.length > 2000) throw new HttpError(400, 'invalid_message');
+  const row = await db.insert('messages', {
+    user_id: req.params.userId,
+    sender_role: 'admin',
+    message: text,
+    is_read: false,
+  });
+  await audit(req, 'reply', 'messages', req.params.userId);
+  res.status(201).json(row);
+}));
+
+adminRouter.patch('/threads/:userId/read', read, wrap(async (req, res) => {
+  await db.update('messages', { user_id: req.params.userId, sender_role: 'customer' }, { is_read: true });
+  res.json({ ok: true });
+}));
+
+adminRouter.get('/stats', read, wrap(async (req, res) => {
+  const [orders, profiles, newMessages, pendingReviews, products] = await Promise.all([
+    db.list('orders', { order: 'created_at', ascending: false, limit: 10000 }),
+    db.list('profiles', { select: 'id', limit: 100000 }),
+    db.list('messages', { select: 'id', eq: { sender_role: 'customer', is_read: false }, limit: 5000 }),
+    db.list('reviews', { select: 'id', eq: { status: 'pending' }, limit: 5000 }),
+    db.list('site_products', { select: 'product_key,name,name_az' }),
+  ]);
+
+  const byStatus = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0]));
+  let revenue = 0;
+  const perProduct = {};
+  const perDay = {};
+
+  for (const o of orders) {
+    byStatus[o.status] = (byStatus[o.status] || 0) + 1;
+    const total = Number(o.total) || 0;
+    if (o.status === 'completed') revenue += total;
+
+    const day = String(o.created_at).slice(0, 10);
+    const d = (perDay[day] ??= { date: day, orders: 0, revenue: 0 });
+    d.orders++;
+    if (o.status === 'completed') d.revenue += total;
+
+    for (const it of Array.isArray(o.items) ? o.items : []) {
+      const p = (perProduct[it.product_key] ??= { product_key: it.product_key, name: it.name, quantity: 0, revenue: 0 });
+      const q = Number(it.quantity) || 0;
+      p.quantity += q;
+      if (o.status === 'completed') p.revenue += (Number(it.unit_price) || 0) * q;
+    }
+  }
+
+  res.json({
+    orders_total: orders.length,
+    orders_by_status: byStatus,
+    new_orders: byStatus.pending,
+    revenue_completed: round2(revenue),
+    customers: profiles.length,
+    new_messages: newMessages.length,
+    pending_reviews: pendingReviews.length,
+    products_count: products.length,
+    top_products: Object.values(perProduct)
+      .map((p) => ({ ...p, revenue: round2(p.revenue) }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10),
+    daily: Object.values(perDay)
+      .sort((a, b) => (a.date
