@@ -1,3 +1,4 @@
+
 /* DigiBaku — məhsul səhifəsi: müddət seçimi, ad + WhatsApp nömrəsi, WhatsApp ilə sifariş, sabit panel */
 (function () {
   var TX = {
