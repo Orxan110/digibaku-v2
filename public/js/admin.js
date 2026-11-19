@@ -416,3 +416,33 @@ function openProductForm(p) {
     },
   });
 }
+/* ---------- Ümumi CRUD: kateqoriya, banner, rəy, FAQ ---------- */
+const ENTITIES = {
+  categories: {
+    title: 'Kateqoriya', api: 'categories', id: 'key', search: ['name_az', 'key'],
+    cols: [['name_az', 'Ad (AZ)'], ['key', 'Açar'], ['icon', 'İkon'], ['sort_order', 'Sıra'], ['active', 'Aktiv']],
+    fields: [
+      { k: 'key', l: 'Açar (slug) *', t: 'text', req: true, createOnly: true },
+      { k: 'name_az', l: 'Ad (AZ) *', t: 'text', req: true },
+      { k: 'name_ru', l: 'Ad (RU)', t: 'text' }, { k: 'name_en', l: 'Ad (EN)', t: 'text' },
+      { k: 'icon', l: 'İkon (emoji)', t: 'text' }, { k: 'sort_order', l: 'Sıra', t: 'number' },
+      { k: 'active', l: 'Aktiv', t: 'bool' },
+    ],
+  },
+  banners: {
+    title: 'Banner', api: 'banners', search: ['title_az'],
+    cols: [['title_az', 'Başlıq (AZ)'], ['cta_url', 'Keçid'], ['sort_order', 'Sıra'], ['active', 'Aktiv']],
+    fields: [
+      { k: 'title_az', l: 'Başlıq (AZ)', t: 'text' }, { k: 'title_ru', l: 'Başlıq (RU)', t: 'text' }, { k: 'title_en', l: 'Başlıq (EN)', t: 'text' },
+      { k: 'subtitle_az', l: 'Alt başlıq (AZ)', t: 'textarea' }, { k: 'subtitle_ru', l: 'Alt başlıq (RU)', t: 'textarea' }, { k: 'subtitle_en', l: 'Alt başlıq (EN)', t: 'textarea' },
+      { k: 'cta_label_az', l: 'Düymə (AZ)', t: 'text' }, { k: 'cta_label_ru', l: 'Düymə (RU)', t: 'text' }, { k: 'cta_label_en', l: 'Düymə (EN)', t: 'text' },
+      { k: 'cta_url', l: 'Düymə keçidi', t: 'text' }, { k: 'image_url', l: 'Şəkil', t: 'image' },
+      { k: 'sort_order', l: 'Sıra', t: 'number' }, { k: 'active', l: 'Aktiv', t: 'bool' },
+    ],
+  },
+  reviews: {
+    title: 'Rəy', api: 'reviews', search: ['author_name'],
+    cols: [['author_name', 'Müəllif'], ['rating', 'Ulduz'], ['status', 'Status'], ['show_on_home', 'Ana səhifə'], ['sort_order', 'Sıra']],
+    fields: [
+      { k: 'author_name', l: 'Müəllif *', t: 'text', req: true }, { k: 'rating', l: 'Ulduz (1–5)', t: 'number' },
+      { k: 'review_date', l: 'Tarix
