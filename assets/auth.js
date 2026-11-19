@@ -1,9 +1,7 @@
-/* DigiBaku — Neon Auth (Better Auth) client
- * Test edilməyib: ilk qeydiyyat cəhdi ilə endpointləri təsdiqləyin.
- * Sessiya cookie ilə saxlanılır (localStorage yoxdur).
- */
+/* DigiBaku — Neon Auth (Better Auth) client */
 (function () {
-  const AUTH_BASE = "/api/auth";
+  const AUTH_BASE =
+    "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
 
   const MESSAGES = {
     az: {
@@ -54,7 +52,6 @@
   }
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
   function validateEmail(email) {
     return EMAIL_RE.test(String(email || "").trim());
   }
@@ -77,7 +74,7 @@
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (!res.ok) {
-      const serverMsg = data && (data.message || data.error && data.error.message);
+      const serverMsg = data && (data.message || (data.error && data.error.message));
       return { ok: false, status: res.status, error: serverMsg || msg("genericError") };
     }
     return { ok: true, data };
