@@ -1,6 +1,6 @@
-/* DigiBaku — Neon Auth client. Giriş birbaşa Neon ünvanına, sifariş üçün JWT token alınır. */
+/* DigiBaku — Neon Auth client. Sorğular saytın öz /api/auth yolu üzərindən gedir (cookie birinci tərəf olsun deyə). */
 (function () {
-  const AUTH_BASE = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
+  const AUTH_BASE = "/api/auth";
 
   const MESSAGES = {
     az: { invalidEmail: "E-poçt düzgün deyil.", shortPassword: "Şifrə ən azı 8 simvol olmalıdır.",
@@ -76,7 +76,7 @@
       if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };
       return { ok: true, session: r.data };
     },
-    // Sifariş API-si üçün JWT token (cookie ilə Neon-dan alınır)
+    // Sifariş API-si üçün JWT token
     async getToken() {
       try {
         const res = await fetch(AUTH_BASE + "/token", { credentials: "include" });
