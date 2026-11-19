@@ -1,7 +1,7 @@
 /* DigiBaku — Neon Auth (Better Auth) client */
 (function () {
-const AUTH_BASE = "/api/auth";
-
+const AUTH_BASE =
+"https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
 
 const MESSAGES = {
 az: {
@@ -42,7 +42,6 @@ genericError: "Something went wrong. Please try again."
 }
 };
 
-
 function currentLang() {
 const saved = localStorage.getItem("digibaku_lang");
 return MESSAGES[saved] ? saved : "az";
@@ -52,7 +51,6 @@ const set = MESSAGES[currentLang()];
 return set[key] || MESSAGES.az[key] || key;
 }
 
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+.[^\s@]{2,}$/;
 function validateEmail(email) {
 return EMAIL_RE.test(String(email || "").trim());
@@ -60,7 +58,6 @@ return EMAIL_RE.test(String(email || "").trim());
 function validatePassword(password) {
 return typeof password === "string" && password.length >= 8;
 }
-
 
 async function call(path, body, method) {
 let res;
@@ -83,7 +80,6 @@ return { ok: false, status: res.status, error: serverMsg || msg("genericError") 
 return { ok: true, data };
 }
 
-
 const DigiAuth = {
 async register({ name, email, password }) {
 if (!name || !name.trim()) return { ok: false, error: msg("nameRequired") };
@@ -94,53 +90,47 @@ if (!r.ok) return r;
 return { ok: true, message: msg("registered"), data: r.data };
 },
 
+async login({ email, password }) {  
+  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };  
+  if (!password) return { ok: false, error: msg("shortPassword") };  
+  const r = await call("/sign-in/email", { email: email.trim(), password });  
+  if (!r.ok) return r;  
+  return { ok: true, message: msg("loggedIn"), data: r.data };  
+},  
 
-async login({ email, password }) {
-  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
-  if (!password) return { ok: false, error: msg("shortPassword") };
-  const r = await call("/sign-in/email", { email: email.trim(), password });
-  if (!r.ok) return r;
-  return { ok: true, message: msg("loggedIn"), data: r.data };
-},
+async logout() {  
+  const r = await call("/sign-out", {});  
+  return r.ok ? { ok: true, message: msg("loggedOut") } : r;  
+},  
 
-async logout() {
-  const r = await call("/sign-out", {});
-  return r.ok ? { ok: true, message: msg("loggedOut") } : r;
-},
+async getSession() {  
+  const r = await call("/get-session", null, "GET");  
+  if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };  
+  return { ok: true, session: r.data };  
+},  
 
-async getSession() {
-  const r = await call("/get-session", null, "GET");
-  if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };
-  return { ok: true, session: r.data };
-},
+async requestPasswordReset({ email, redirectTo }) {  
+  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };  
+  const r = await call("/request-password-reset", {  
+    email: email.trim(),  
+    redirectTo: redirectTo || (location.origin + "/login.html?reset=1")  
+  });  
+  if (!r.ok) return r;  
+  return { ok: true, message: msg("resetSent") };  
+},  
 
-async requestPasswordReset({ email, redirectTo }) {
-  if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
-  const r = await call("/request-password-reset", {
-    email: email.trim(),
-    redirectTo: redirectTo || (location.origin + "/login.html?reset=1")
-  });
-  if (!r.ok) return r;
-  return { ok: true, message: msg("resetSent") };
-},
+async resetPassword({ token, newPassword }) {  
+  if (!validatePassword(newPassword)) return { ok: false, error: msg("shortPassword") };  
+  const r = await call("/reset-password", { token, newPassword });  
+  if (!r.ok) return r;  
+  return { ok: true, message: msg("passwordReset") };  
+},  
 
-async resetPassword({ token, newPassword }) {
-  if (!validatePassword(newPassword)) return { ok: false, error: msg("shortPassword") };
-  const r = await call("/reset-password", { token, newPassword });
-  if (!r.ok) return r;
-  return { ok: true, message: msg("passwordReset") };
-},
-
-msg,
-validateEmail,
+msg,  
+validateEmail,  
 validatePassword
-
-
 
 };
 
-
 window.DigiAuth = DigiAuth;
-})();
-
-
+})(); 
