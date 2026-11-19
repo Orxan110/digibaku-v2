@@ -129,3 +129,126 @@ function priceValues(input) {
 }
 
 const slugKey = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+adminRouter.get('/products', read, wrap(async (req, res) => {
+  const [products, prices] = await Promise.all([
+    db.list('site_products', { order: 'sort_order' }),
+    db.list('product_prices'),
+  ]);
+  const pm = new Map(prices.map((p) => [p.product_key, p]));
+  res.json(products.map((p) => ({ ...p, prices: pm.get(p.product_key) ?? null })));
+}));
+
+adminRouter.post('/products', write, wrap(async (req, res) => {
+  const key = slugKey(req.body?.product_key);
+  if (!key) throw new HttpError(400, 'product_key_required');
+  const row = { ...productRow(req.body), product_key: key, slug: req.body.slug || key };
+  const product = await db.insert('site_products', row);
+  await db.upsert('product_prices', {
+    product_key: key,
+    product_name: row.name_az || row.name || key,
+    ...priceValues(req.body.prices),
+  }, 'product_key');
+  invalidateCatalog();
+  await audit(req, 'create', 'site_products', key);
+  res.status(201).json(product);
+}));
+
+adminRouter.put('/products/:key', write, wrap(async (req, res) => {
+  const key = req.params.key;
+  const row = productRow(req.body);
+  let product;
+  if (Object.keys(row).length) {
+    [product] = await db.update('site_products', { product_key: key }, row);
+  } else {
+    product = await db.one('site_products', { product_key: key });
+  }
+  if (!product) throw new HttpError(404, 'not_found');
+
+  if (req.body.prices !== undefined) {
+    await db.upsert('product_prices', {
+      product_key: key,
+      product_name: product.name_az || product.name || key,
+      ...priceValues(req.body.prices),
+    }, 'product_key');
+  }
+  invalidateCatalog();
+  await audit(req, 'update', 'site_products', key);
+  res.json(product);
+}));
+
+adminRouter.delete('/products/:key', write, wrap(async (req, res) => {
+  const key = req.params.key;
+  if (req.query.hard === '1') {
+    await db.remove('product_prices', { product_key: key });
+    await db.remove('site_products', { product_key: key });
+  } else {
+    await db.update('site_products', { product_key: key }, { active: false });
+  }
+  invalidateCatalog();
+  await audit(req, req.query.hard === '1' ? 'hard_delete' : 'deactivate', 'site_products', key);
+  res.status(204).end();
+}));
+
+const IMG_TYPES = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/avif': 'avif' };
+
+adminRouter.post(
+  '/upload',
+  write,
+  express.raw({ type: Object.keys(IMG_TYPES), limit: '5mb' }),
+  wrap(async (req, res) => {
+    const mime = (req.headers['content-type'] || '').split(';')[0];
+    const ext = IMG_TYPES[mime];
+    if (!ext || !Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'invalid_image');
+    const folder = String(req.query.folder || 'misc').replace(/[^a-z0-9_-]/gi, '') || 'misc';
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const url = await db.uploadPublic(process.env.STORAGE_BUCKET || 'product-images', path, req.body, mime);
+    await audit(req, 'upload', 'storage', path);
+    res.status(201).json({ url });
+  })
+);
+
+const KEY_RE = /^[a-z0-9_.-]{1,80}$/;
+const SETTING_KEYS = ['site_name', 'logo_url', 'whatsapp', 'email', 'phone', 'address', 'chat_url', 'socials'];
+
+adminRouter.get('/content', read, wrap(async (req, res) => {
+  res.json(await db.list('site_content', { order: 'key' }));
+}));
+
+adminRouter.put('/content', write, wrap(async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (items.length > 500) throw new HttpError(400, 'too_many');
+  for (const it of items) {
+    if (!KEY_RE.test(it?.key) || !LANGS.includes(it?.lang)) throw new HttpError(400, 'invalid_content');
+    if (String(it.value ?? '').length > 20000) throw new HttpError(400, 'too_long');
+    await db.upsert('site_content', {
+      key: it.key,
+      lang: it.lang,
+      value: String(it.value ?? ''),
+      updated_at: new Date().toISOString(),
+    }, 'key,lang');
+  }
+  invalidateCatalog();
+  await audit(req, 'update', 'site_content', items.length);
+  res.json({ ok: true, saved: items.length });
+}));
+
+adminRouter.get('/settings', read, wrap(async (req, res) => {
+  res.json(await db.list('site_settings'));
+}));
+
+adminRouter.put('/settings', write, wrap(async (req, res) => {
+  const values = req.body?.values && typeof req.body.values === 'object' ? req.body.values : {};
+  const saved = [];
+  for (const key of SETTING_KEYS) {
+    if (values[key] === undefined) continue;
+    await db.upsert('site_settings', {
+      key,
+      value: values[key],
+      updated_at: new Date().toISOString(),
+    }, 'key');
+    saved.push(key);
+  }
+  invalidateCatalog();
+  await audit(req, 'update', 'site_settings', saved.join(','));
+  res.json({ ok: true, saved });
+}));
