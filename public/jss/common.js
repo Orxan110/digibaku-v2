@@ -2,7 +2,8 @@ import { createAuthClient } from 'https://esm.sh/@neondatabase/auth';
 import { SupabaseAuthAdapter } from 'https://esm.sh/@neondatabase/auth/vanilla/adapters';
 
 
-export const $ = (selector, root = document) => root.querySelector(selector);
+export const $ = (selector, root = document) =>
+root.querySelector(selector);
 
 
 export const esc = (value = '') =>
@@ -117,7 +118,7 @@ T[getLang()][key] ?? T.az[key] ?? key;
 
 
 export function safeNext(value) {
-if (!value || !/^(profile|chat|index|product).html/.test(value)) {
+if (!value || !/^(profile|chat|index|product).html(?:[?#].*)?$/.test(value)) {
 return 'profile.html';
 }
 return value;
@@ -225,7 +226,10 @@ const config = await api('/public/config');
   });
 
   return { auth };
-})();
+})().catch(error => {
+  authPromise = null;
+  throw error;
+});
 
 
 
