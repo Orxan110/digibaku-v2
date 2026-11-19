@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DigiBaku — Rəqəmsal abunəliklər</title>
+<meta name="description" content="Netflix, YouTube Premium, ChatGPT, Spotify və digər rəqəmsal abunəliklər — DigiBaku.">
+<link rel="icon" href="/assets/img/netflix.webp">
+<link rel="stylesheet" href="/css/store.css">
+</head>
+<body>
+<header class="topbar" id="top">
+  <a class="brand" href="/" aria-label="DigiBaku">
+    <span class="brand-mark">D</span><span class="brand-name">DigiBaku</span>
+  </a>
+  <nav class="nav" id="nav">
+    <a href="#categories" data-i18n="navCategories">Kateqoriyalar</a>
+    <a href="#products" data-i18n="navProducts">Məhsullar</a>
+    <a href="#reviews" data-i18n="navReviews">Rəylər</a>
+    <a href="#faq" data-i18n="navFaq">FAQ</a>
+    <a href="qiymetler.html" data-i18n="navPrices">Qiymətlər</a>
+  </nav>
+  <div class="top-actions">
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="az">AZ</button><button data-lang="ru">RU</button><button data-lang="en">EN</button>
+    </div>
+    <a class="chip" href="/chat.html" data-i18n="chat">Çat</a>
+    <a class="chip chip-solid" href="/login.html" data-i18n="account">Hesab</a>
+  </div>
+</header>
+
+<main id="app">
+  <section class="state" id="loading">
+    <div class="skeleton skeleton-hero"></div>
+    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  </section>
+  <section class="state state-error" id="failed" hidden>
+    <p data-i18n="loadError">Məlumat yüklənə bilmədi.</p>
+    <button class="chip chip-solid" id="retry" data-i18n="retry">Yenidən cəhd et</button>
+  </section>
+  <div id="content" hidden></div>
+</main>
+
+<footer class="footer" id="footer"></footer>
+<a class="wa-float" id="waFloat" hidden target="_blank" rel="noopener" aria-label="WhatsApp">WhatsApp</a>
+
+<script src="/js/store.js" type="module"></script>
+</body>
+</html>
