@@ -1,34 +1,31 @@
-(async function(){
-  var lang=DB.lang, box=document.getElementById("productBox");
-  var slug=new URLSearchParams(location.search).get("slug")||"";
-  var r=await DBApi.get("/api/products");
-  if(!r.ok){ box.innerHTML='<div class="empty">Məhsul yüklənmədi.</div>'; return; }
-  var p=(r.data.products||[]).find(function(x){return x.slug===slug;});
-  if(!p){ box.innerHTML='<div class="empty">Məhsul tapılmadı. <a href="products.html">Məhsullara qayıt</a></div>'; return; }
-  var name=p.name[lang]||p.name.az, desc=p.description[lang]||p.description.az||"", feats=p.features[lang]&&p.features[lang].length?p.features[lang]:(p.features.az||[]);
-  var sel=p.prices[0].months;
+/* DigiBaku — məhsul detal səhifəsi: müddət seçimi, qiymət, səbət, WhatsApp, sabit panel */
+(function () {
+  var TX = {
+    az: { back: "← Məhsullara qayıt", notFound: "Məhsul tapılmadı.", loadErr: "Məhsul yüklənmədi. Səhifəni yeniləyin.",
+      duration: "Müddət", month: "ay", perPrice: "Qiymət", addCart: "Səbətə at", added: "Səbətə əlavə olundu.",
+      buyWa: "WhatsApp-la sifariş et", wa: "Salam, bu məhsulu sifariş etmək istəyirəm: ",
+      waMonths: "müddət", waPrice: "qiymət", stickyLabel: "Seçilmiş paket", noImg: "Şəkil yoxdur",
+      noFeat: "", pickMonth: "Müddəti seçin" },
+    ru: { back: "← Назад к товарам", notFound: "Товар не найден.", loadErr: "Не удалось загрузить товар. Обновите страницу.",
+      duration: "Срок", month: "мес.", perPrice: "Цена", addCart: "В корзину", added: "Добавлено в корзину.",
+      buyWa: "Заказать в WhatsApp", wa: "Здравствуйте, хочу заказать этот товар: ",
+      waMonths: "срок", waPrice: "цена", stickyLabel: "Выбранный пакет", noImg: "Нет изображения",
+      noFeat: "", pickMonth: "Выберите срок" },
+    en: { back: "← Back to products", notFound: "Product not found.", loadErr: "Product could not be loaded. Please refresh.",
+      duration: "Duration", month: "mo", perPrice: "Price", addCart: "Add to cart", added: "Added to cart.",
+      buyWa: "Order via WhatsApp", wa: "Hello, I would like to order this product: ",
+      waMonths: "duration", waPrice: "price", stickyLabel: "Selected plan", noImg: "No image",
+      noFeat: "", pickMonth: "Choose duration" }
+  };
 
-  function render(){
-    var cur=p.prices.find(function(x){return x.months===sel;});
-    box.innerHTML =
-      '<div class="grid" style="grid-template-columns:1fr">'+
-      '<div class="card"><div class="img">'+(p.image_url?'<img src="'+esc(p.image_url)+'" alt="'+esc(name)+'" data-img>':esc(p.name.az))+'</div></div>'+
-      '<div class="card-box" style="margin-top:12px"><h1 style="font-size:22px;margin-bottom:6px">'+esc(name)+'</h1>'+
-      '<p class="muted" style="margin-bottom:12px">'+esc(desc)+'</p>'+
-      (feats.length?'<ul style="margin:0 0 14px 18px;color:var(--muted)">'+feats.map(function(f){return '<li>'+esc(f)+'</li>';}).join("")+'</ul>':'')+
-      '<div class="field"><label>Müddət</label><div style="display:flex;gap:6px;flex-wrap:wrap">'+
-        p.prices.map(function(x){return '<button class="btn '+(x.months===sel?'gold':'')+'" data-m="'+x.months+'">'+x.months+' ay</button>';}).join("")+
-      '</div></div>'+
-      '<p class="price" style="font-size:22px;margin:10px 0">'+cur.price.toFixed(2)+' AZN</p>'+
-      '<button class="btn gold" id="addBtn" style="width:100%">'+DB.t("add")+'</button>'+
-      '<p class="ok" id="addOk"></p></div></div>';
-    box.querySelectorAll("img[data-img]").forEach(function(im){ im.addEventListener("error",function(){ im.replaceWith(document.createTextNode("Şəkil yoxdur")); }); });
-    box.querySelectorAll("[data-m]").forEach(function(b){ b.onclick=function(){ sel=Number(b.dataset.m); render(); }; });
-    document.getElementById("addBtn").onclick=function(){
-      DB.cart.add(p.product_key, sel);
-      document.getElementById("addOk").textContent="Səbətə əlavə olundu.";
-    };
+  var lang = DB.lang;
+  var t = TX[lang] || TX.az;
+  var WA = "https://wa.me/994513626349";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
   }
-  document.title=name+" — DigiBaku";
-  render();
-})();
+
+  var slug = new URLSearchParams(location.search).get("slug") || "";
