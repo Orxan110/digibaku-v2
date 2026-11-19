@@ -1,36 +1,74 @@
 import { createClient } from '@supabase/supabase-js';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { HttpError } from '../http.js';
 
-/*
- * Supabase YALNIZ iki iş görür: (1) Auth — istifadəçini token-dən yoxlamaq,
- * (2) Storage — məhsul şəkilləri. Verilənlər Neon-dadır.
- * Service-role açarı yalnız serverdə istifadə olunur.
- */
-const url = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-let admin = null;
+const authUrl = process.env.NEON_AUTH_URL;
+const jwksUrl = process.env.NEON_AUTH_JWKS_URL;
 
-function client() {
-  if (!url || !serviceKey) throw new HttpError(500, 'supabase_not_configured');
-  admin ??= createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+let admin = null;
+let jwks = null;
+
+function storageClient() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new HttpError(500, 'storage_not_configured');
+  }
+
+  admin ??= createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+
   return admin;
+}
+
+function getJWKS() {
+  if (!authUrl || !jwksUrl) {
+    throw new HttpError(500, 'neon_auth_not_configured');
+  }
+
+  jwks ??= createRemoteJWKSet(new URL(jwksUrl));
+  return jwks;
 }
 
 export async function getUserFromToken(token) {
   if (!token) return null;
-  const { data, error } = await client().auth.getUser(token);
-  if (error || !data?.user) return null;
-  return data.user;
+
+  try {
+    const { payload } = await jwtVerify(token, getJWKS(), {
+      issuer: authUrl
+    });
+
+    if (!payload.sub) return null;
+
+    return {
+      id: payload.sub,
+      email: payload.email || null,
+      user_metadata: {
+        full_name: payload.name || null
+      }
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function uploadPublic(bucket, path, body, contentType) {
-  const { error } = await client().storage.from(bucket).upload(path, body, { contentType, upsert: false });
+  const client = storageClient();
+
+  const { error } = await client.storage
+    .from(bucket)
+    .upload(path, body, { contentType, upsert: false });
+
   if (error) throw new HttpError(400, error.message);
-  return client().storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+  return client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
-/** Brauzerə verilən YALNIZ ictimai açar (anon). Service-role heç vaxt göndərilmir. */
 export const authConfig = () => ({
-  supabaseUrl: url || null,
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null,
+  neonAuthUrl: authUrl || null
 });
