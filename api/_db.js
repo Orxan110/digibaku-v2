@@ -9,22 +9,42 @@ const pool = globalThis.digibakuPool || new Pool({
 });
 globalThis.digibakuPool = pool;
 
-const JWKS_URL = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth/.well-known/jwks.json";
+const NEON_BASE = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
+const JWKS_URL = NEON_BASE + "/.well-known/jwks.json";
 let jwksCache = null;
 
-// Authorization: Bearer <token> başlığından istifadəçi ID-si (sub).
-// jose yalnız sifariş yoxlanılanda yüklənir ki, məhsullar buna görə işləməsin.
-async function getUserId(req) {
+// 1) JWT yoxlanışı (token nöqtə ilə üç hissədən ibarətdirsə)
+async function verifyJwt(token) {
   try {
-    const h = req.headers.authorization || "";
-    const m = h.match(/^Bearer\s+(.+)$/);
-    if (!m) return null;
     const jose = require("jose");
     if (!jwksCache) jwksCache = jose.createRemoteJWKSet(new URL(JWKS_URL));
-    const { payload } = await jose.jwtVerify(m[1], jwksCache);
+    const { payload } = await jose.jwtVerify(token, jwksCache);
     return payload.sub || null;
   } catch (e) {
     return null;
   }
 }
+
+// 2) Sessiya tokeni yoxlanışı: Neon-un get-session ünvanına Bearer ilə
+async function verifySession(token) {
+  try {
+    const r = await fetch(NEON_BASE + "/get-session", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.user && j.user.id ? j.user.id : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getUserId(req) {
+  const h = req.headers.authorization || "";
+  const m = h.match(/^Bearer\s+(.+)$/);
+  if (!m) return null;
+  const token = m[1].trim();
+  return (await verifyJwt(token)) || (await verifySession(token));
+}
+
 module.exports = { pool, getUserId };
