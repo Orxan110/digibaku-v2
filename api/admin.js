@@ -3,6 +3,8 @@ const { pool } = require("./_db");
 
 const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
 const MONTHS = [1, 2, 3, 6, 12];
+const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
+const FAQ_LANGS = ["az", "ru", "en"];
 
 function body(req) {
   if (!req.body) return {};
@@ -36,7 +38,6 @@ function safeEq(x, y) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-// Boş dəyər -> null; rəqəm -> 2 onluq; yanlış/mənfi -> NaN
 function num(v) {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
@@ -91,8 +92,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "GET" && action === "products") {
-    const cats = await pool.query(
-      "select key, name_az from categories order by sort_order, name_az");
+    const cats = await pool.query("select key, name_az from categories order by sort_order, name_az");
     const prods = await pool.query(
       `select p.product_key, p.name_az, p.name_ru, p.name_en, p.category_key, p.image_url, p.active, p.sort_order,
               pp.price_1_month, pp.price_2_month, pp.price_3_month, pp.price_6_month, pp.price_12_month,
@@ -126,7 +126,6 @@ module.exports = async function handler(req, res) {
     const key = String(b.product_key || "");
     const prices = b.prices || {};
     if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
-
     const exists = await pool.query("select 1 from site_products where product_key = $1", [key]);
     if (!exists.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
 
@@ -143,7 +142,6 @@ module.exports = async function handler(req, res) {
       cols.push("price_" + m + "_month", "sale_" + m + "_price", "sale_" + m + "_active");
       vals.push(price, sale, saleOn);
     }
-
     const sets = cols.map((c, i) => c + " = $" + (i + 2)).join(", ");
     const upd = await pool.query(
       "update product_prices set " + sets + ", updated_at = now() where product_key = $1 returning product_key",
@@ -155,6 +153,71 @@ module.exports = async function handler(req, res) {
         "values ($1, (select name_az from site_products where product_key = $1), " + ph + ")",
         [key].concat(vals));
     }
+    return res.status(200).json({ ok: true });
+  }
+
+  // ---------- KATEQORİYALAR ----------
+  if (req.method === "GET" && action === "categories") {
+    const r = await pool.query(
+      "select key, name_az, name_ru, name_en, icon, sort_order, active from categories order by sort_order, name_az");
+    return res.status(200).json({ ok: true, categories: r.rows });
+  }
+
+  if (req.method === "POST" && action === "category_save") {
+    const b = body(req);
+    const key = String(b.key || "").trim();
+    const nameAz = txt(b.name_az);
+    if (!nameAz) return res.status(400).json({ ok: false, error: "Azərbaycanca ad daxil edin." });
+    const sort = parseInt(b.sort_order, 10) || 0;
+    const upd = await pool.query(
+      `update categories set name_az = $2, name_ru = $3, name_en = $4, icon = $5, sort_order = $6, active = $7
+       where key = $1 returning key`,
+      [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.icon), sort, !!b.active]);
+    if (upd.rowCount) return res.status(200).json({ ok: true });
+    if (!CAT_KEY_RE.test(key)) {
+      return res.status(400).json({ ok: false, error: "Açar yalnız kiçik latın hərfi, rəqəm və _ ola bilər (2–40 simvol)." });
+    }
+    await pool.query(
+      `insert into categories (key, name_az, name_ru, name_en, icon, sort_order, active)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.icon), sort, !!b.active]);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ---------- FAQ ----------
+  if (req.method === "GET" && action === "faqs") {
+    const r = await pool.query(
+      "select id, question, answer, language, sort_order, active from site_faqs order by language, sort_order, created_at");
+    return res.status(200).json({ ok: true, faqs: r.rows });
+  }
+
+  if (req.method === "POST" && action === "faq_save") {
+    const b = body(req);
+    const lang = String(b.language || "az");
+    const q = txt(b.question);
+    const a = txt(b.answer);
+    if (!FAQ_LANGS.includes(lang)) return res.status(400).json({ ok: false, error: "Dil yanlışdır." });
+    if (!q || !a) return res.status(400).json({ ok: false, error: "Sual və cavab daxil edin." });
+    const sort = parseInt(b.sort_order, 10) || 0;
+    if (b.id) {
+      const r = await pool.query(
+        `update site_faqs set question = $2, answer = $3, language = $4, sort_order = $5, active = $6
+         where id = $1 returning id`,
+        [String(b.id), q, a, lang, sort, !!b.active]);
+      if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sual tapılmadı." });
+      return res.status(200).json({ ok: true, id: r.rows[0].id });
+    }
+    const r = await pool.query(
+      `insert into site_faqs (question, answer, language, sort_order, active)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [q, a, lang, sort, !!b.active]);
+    return res.status(200).json({ ok: true, id: r.rows[0].id });
+  }
+
+  if (req.method === "POST" && action === "faq_delete") {
+    const b = body(req);
+    const r = await pool.query("delete from site_faqs where id = $1 returning id", [String(b.id || "")]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sual tapılmadı." });
     return res.status(200).json({ ok: true });
   }
 
