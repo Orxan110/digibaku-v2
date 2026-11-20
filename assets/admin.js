@@ -1,225 +1,238 @@
-const crypto = require("crypto");
-const { pool } = require("./_db");
+(function () {
+  var KEY = "digibaku_admin";
+  var LABELS = { pending: "Cavab gözləyir", confirmed: "Təsdiqləndi", processing: "Hazırlanır",
+    completed: "Hazırdır", cancelled: "Ləğv edildi" };
+  var STATUSES = Object.keys(LABELS);
+  var MONTHS = [1, 2, 3, 6, 12];
+  var TITLES = { orders: "Sifarişlər", products: "Məhsullar" };
+  var INP = "width:100%;padding:9px;border-radius:10px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5;box-sizing:border-box";
 
-const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
-const MONTHS = [1, 2, 3, 6, 12];
-const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
-const FAQ_LANGS = ["az", "ru", "en"];
+  var list = document.getElementById("list");
+  var msg = document.getElementById("msg");
+  var login = document.getElementById("login");
+  var pw = document.getElementById("pw");
+  var side = document.getElementById("side");
+  var nav = document.getElementById("nav");
+  var secTitle = document.getElementById("secTitle");
+  var logoutBtn = document.getElementById("logoutBtn");
+  var CATS = [];
 
-function body(req) {
-  if (!req.body) return {};
-  if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch (e) { return {}; } }
-  return req.body;
-}
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function showMsg(t) { msg.textContent = t || ""; }
+  function getTok() { return localStorage.getItem(KEY) || ""; }
 
-function sign(payload) {
-  const secret = process.env.ADMIN_SECRET || "";
-  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto.createHmac("sha256", secret).update(data).digest("base64url");
-  return data + "." + sig;
-}
+  async function api(path, opts) {
+    opts = opts || {};
+    var headers = {};
+    var tk = getTok();
+    if (tk) headers.Authorization = "Bearer " + tk;
+    if (opts.body) headers["Content-Type"] = "application/json";
+    var r = await fetch(path, {
+      method: opts.method || "GET",
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    var data = await r.json().catch(function () { return {}; });
+    return { ok: r.ok, status: r.status, data: data };
+  }
 
-function verify(token) {
-  const secret = process.env.ADMIN_SECRET || "";
-  if (!secret || !token || token.indexOf(".") < 0) return null;
-  const parts = token.split(".");
-  const data = parts[0], sig = parts[1];
-  const expect = crypto.createHmac("sha256", secret).update(data).digest("base64url");
-  const a = Buffer.from(sig), b = Buffer.from(expect);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  let p;
-  try { p = JSON.parse(Buffer.from(data, "base64url").toString()); } catch (e) { return null; }
-  if (!p.exp || Date.now() > p.exp) return null;
-  return p;
-}
+  function setActive(sec) {
+    nav.querySelectorAll("[data-sec]").forEach(function (b) {
+      b.className = "ad-link" + (b.getAttribute("data-sec") === sec ? " on" : "");
+    });
+    secTitle.textContent = TITLES[sec] || "Admin";
+    side.classList.remove("open");
+  }
 
-function safeEq(x, y) {
-  const a = Buffer.from(String(x)), b = Buffer.from(String(y));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
+  function showLogin() {
+    login.style.display = "";
+    logoutBtn.style.display = "none";
+    list.innerHTML = "";
+    secTitle.textContent = "Admin girişi";
+  }
+  function expired() { localStorage.removeItem(KEY); showLogin(); showMsg("Sessiya bitib. Yenidən daxil olun."); }
 
-function num(v) {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < 0) return NaN;
-  return Math.round(n * 100) / 100;
-}
+  function go(sec) {
+    setActive(sec);
+    showMsg("");
+    if (sec === "orders") loadOrders(); else loadProducts();
+  }
 
-function txt(v) {
-  const s = String(v == null ? "" : v).trim();
-  return s ? s : null;
-}
+  // ---------- SİFARİŞLƏR ----------
+  function renderOrders(orders) {
+    if (!orders.length) { list.innerHTML = '<div class="empty">Sifariş yoxdur.</div>'; return; }
+    list.innerHTML = orders.map(function (o) {
+      var items = (o.items || []).map(function (i) {
+        return esc(i.name) + " · " + i.months + " ay × " + i.qty;
+      }).join("<br>");
+      var opts = STATUSES.map(function (s) {
+        return '<option value="' + s + '"' + (s === o.status ? " selected" : "") + ">" + LABELS[s] + "</option>";
+      }).join("");
+      return '<div class="card-box" style="margin-bottom:10px">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px"><b>#' + esc(String(o.id).slice(0, 8)) +
+        '</b><span class="price">' + Number(o.total).toFixed(2) + " AZN</span></div>" +
+        '<p class="muted" style="font-size:13px">' + esc(o.email || "—") + " · " +
+        esc(new Date(o.created_at).toLocaleString("az-AZ")) + "</p>" +
+        '<p style="margin:6px 0">' + items + "</p>" +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+        '<select data-id="' + esc(o.id) + '" style="' + INP + ';flex:1">' + opts + "</select>" +
+        '<button class="btn gold" data-save="' + esc(o.id) + '">Saxla</button></div></div>';
+    }).join("");
 
-module.exports = async function handler(req, res) {
-  res.setHeader("Cache-Control", "no-store");
-  const action = (req.query && req.query.action) || "";
+    list.querySelectorAll("[data-save]").forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.getAttribute("data-save");
+        var sel = list.querySelector('select[data-id="' + id + '"]');
+        var r = await api("/api/admin?action=order_status", { method: "POST", body: { id: id, status: sel.value } });
+        if (r.status === 401) { expired(); return; }
+        if (!r.ok) { showMsg((r.data && r.data.error) || "Xəta baş verdi."); return; }
+        showMsg("Yadda saxlandı: #" + id.slice(0, 8));
+      };
+    });
+  }
 
-  if (req.method === "POST" && action === "login") {
-    const pass = process.env.ADMIN_PASSWORD || "";
-    if (!pass || !process.env.ADMIN_SECRET) {
-      return res.status(500).json({ ok: false, error: "ADMIN_PASSWORD və ya ADMIN_SECRET Vercel-də təyin olunmayıb." });
+  async function loadOrders() {
+    list.innerHTML = '<div class="empty">Yüklənir...</div>';
+    var r = await api("/api/admin?action=orders");
+    if (r.status === 401) { expired(); return; }
+    if (!r.ok) { showMsg((r.data && r.data.error) || "Sifarişlər yüklənmədi."); list.innerHTML = ""; return; }
+    renderOrders(r.data.orders || []);
+  }
+
+  // ---------- MƏHSULLAR ----------
+  function priceRow(p, m) {
+    var price = p["price_" + m + "_month"];
+    var sale = p["sale_" + m + "_price"];
+    var on = p["sale_" + m + "_active"] === true;
+    return '<div style="display:grid;grid-template-columns:52px 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px">' +
+      '<span class="muted">' + m + " ay</span>" +
+      '<input data-f="price_' + m + '" type="number" step="0.01" min="0" placeholder="Qiymət" value="' +
+        (price == null ? "" : esc(price)) + '" style="' + INP + '">' +
+      '<input data-f="sale_' + m + '" type="number" step="0.01" min="0" placeholder="Satış" value="' +
+        (sale == null ? "" : esc(sale)) + '" style="' + INP + '">' +
+      '<label class="muted" style="font-size:12px"><input data-f="saleon_' + m + '" type="checkbox"' +
+        (on ? " checked" : "") + "> endirim</label></div>";
+  }
+
+  function renderProducts(products) {
+    if (!products.length) { list.innerHTML = '<div class="empty">Məhsul yoxdur.</div>'; return; }
+    list.innerHTML = products.map(function (p) {
+      var catOpts = CATS.map(function (c) {
+        return '<option value="' + esc(c.key) + '"' + (c.key === p.category_key ? " selected" : "") + ">" +
+          esc(c.name_az) + "</option>";
+      }).join("");
+      return '<div class="card-box" data-key="' + esc(p.product_key) + '" style="margin-bottom:12px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<b>' + esc(p.name_az) + '</b>' +
+        '<label class="muted" style="font-size:13px"><input data-f="active" type="checkbox"' +
+        (p.active ? " checked" : "") + "> aktiv</label></div>" +
+        '<label class="muted" style="font-size:12px">Ad (AZ)</label>' +
+        '<input data-f="name_az" value="' + esc(p.name_az) + '" style="' + INP + ';margin-bottom:6px">' +
+        '<label class="muted" style="font-size:12px">Ad (RU)</label>' +
+        '<input data-f="name_ru" value="' + esc(p.name_ru || "") + '" style="' + INP + ';margin-bottom:6px">' +
+        '<label class="muted" style="font-size:12px">Ad (EN)</label>' +
+        '<input data-f="name_en" value="' + esc(p.name_en || "") + '" style="' + INP + ';margin-bottom:6px">' +
+        '<label class="muted" style="font-size:12px">Kateqoriya</label>' +
+        '<select data-f="category_key" style="' + INP + ';margin-bottom:6px">' + catOpts + "</select>" +
+        '<label class="muted" style="font-size:12px">Şəkil URL-i</label>' +
+        '<input data-f="image_url" value="' + esc(p.image_url || "") + '" style="' + INP + ';margin-bottom:10px">' +
+        '<div class="muted" style="font-size:12px;margin-bottom:6px">Müddət · Qiymət · Satış · Endirim</div>' +
+        MONTHS.map(function (m) { return priceRow(p, m); }).join("") +
+        '<button class="btn gold" data-psave="' + esc(p.product_key) + '" style="width:100%;margin-top:8px">Yadda saxla</button>' +
+        "</div>";
+    }).join("");
+
+    list.querySelectorAll("[data-psave]").forEach(function (b) {
+      b.onclick = function () { saveProduct(b.getAttribute("data-psave"), b); };
+    });
+  }
+
+  function val(card, f) {
+    var el = card.querySelector('[data-f="' + f + '"]');
+    if (!el) return "";
+    return el.type === "checkbox" ? el.checked : el.value;
+  }
+
+  async function saveProduct(key, btn) {
+    var card = list.querySelector('[data-key="' + key + '"]');
+    btn.disabled = true;
+    showMsg("");
+    var prod = await api("/api/admin?action=product_save", { method: "POST", body: {
+      product_key: key,
+      name_az: val(card, "name_az"),
+      name_ru: val(card, "name_ru"),
+      name_en: val(card, "name_en"),
+      category_key: val(card, "category_key"),
+      image_url: val(card, "image_url"),
+      active: val(card, "active")
+    } });
+    if (prod.status === 401) { btn.disabled = false; expired(); return; }
+    if (!prod.ok) { btn.disabled = false; showMsg((prod.data && prod.data.error) || "Məhsul yadda saxlanmadı."); return; }
+
+    var prices = {};
+    MONTHS.forEach(function (m) {
+      prices[m] = { price: val(card, "price_" + m), sale: val(card, "sale_" + m), saleActive: val(card, "saleon_" + m) };
+    });
+    var pr = await api("/api/admin?action=price_save", { method: "POST", body: { product_key: key, prices: prices } });
+    btn.disabled = false;
+    if (!pr.ok) { showMsg((pr.data && pr.data.error) || "Qiymət yadda saxlanmadı."); return; }
+    showMsg("Yadda saxlandı: " + key);
+  }
+
+  async function loadProducts() {
+    list.innerHTML = '<div class="empty">Yüklənir...</div>';
+    var r = await api("/api/admin?action=products");
+    if (r.status === 401) { expired(); return; }
+    if (!r.ok) { showMsg((r.data && r.data.error) || "Məhsullar yüklənmədi."); list.innerHTML = ""; return; }
+    CATS = r.data.categories || [];
+    renderProducts(r.data.products || []);
+  }
+
+  // ---------- GİRİŞ / BAŞLANĞIC ----------
+  async function start() {
+    try {
+      var me = await api("/api/admin?action=me");
+      if (me.status === 401) { localStorage.removeItem(KEY); showLogin(); showMsg(""); return; }
+      login.style.display = "none";
+      logoutBtn.style.display = "";
+      go("orders");
+    } catch (e) {
+      showMsg("Xəta: " + String(e && e.message || e));
     }
-    const b = body(req);
-    if (!safeEq(b.password || "", pass)) return res.status(401).json({ ok: false, error: "Şifrə yanlışdır." });
-    const token = sign({ role: "admin", exp: Date.now() + 12 * 60 * 60 * 1000 });
-    return res.status(200).json({ ok: true, token: token });
   }
 
-  const h = req.headers.authorization || "";
-  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
-  if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
-
-  if (req.method === "GET" && action === "me") {
-    return res.status(200).json({ ok: true, isAdmin: true });
-  }
-
-  if (req.method === "GET" && action === "orders") {
-    const r = await pool.query(
-      `select o.id, o.total, o.status, o.items, o.created_at, u.email
-       from orders o left join neon_auth."user" u on u.id = o.user_id
-       order by o.created_at desc limit 200`);
-    return res.status(200).json({ ok: true, orders: r.rows });
-  }
-
-  if (req.method === "POST" && action === "order_status") {
-    const b = body(req);
-    if (!STATUSES.includes(b.status)) return res.status(400).json({ ok: false, error: "Status yanlışdır." });
-    const r = await pool.query(
-      "update orders set status = $1, updated_at = now() where id = $2 returning id, status",
-      [b.status, String(b.id)]);
-    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sifariş tapılmadı." });
-    return res.status(200).json({ ok: true, order: r.rows[0] });
-  }
-
-  if (req.method === "GET" && action === "products") {
-    const cats = await pool.query("select key, name_az from categories order by sort_order, name_az");
-    const prods = await pool.query(
-      `select p.product_key, p.name_az, p.name_ru, p.name_en, p.category_key, p.image_url, p.active, p.sort_order,
-              pp.price_1_month, pp.price_2_month, pp.price_3_month, pp.price_6_month, pp.price_12_month,
-              pp.sale_1_price, pp.sale_2_price, pp.sale_3_price, pp.sale_6_price, pp.sale_12_price,
-              pp.sale_1_active, pp.sale_2_active, pp.sale_3_active, pp.sale_6_active, pp.sale_12_active
-       from site_products p
-       left join product_prices pp on pp.product_key = p.product_key
-       order by p.sort_order, p.name_az`);
-    return res.status(200).json({ ok: true, categories: cats.rows, products: prods.rows });
-  }
-
-  if (req.method === "POST" && action === "product_save") {
-    const b = body(req);
-    const key = String(b.product_key || "");
-    const nameAz = txt(b.name_az);
-    if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
-    if (!nameAz) return res.status(400).json({ ok: false, error: "Azərbaycanca ad daxil edin." });
-    const r = await pool.query(
-      `update site_products
-       set name = $2, name_az = $2, name_ru = $3, name_en = $4, category_key = $5,
-           image_url = $6, active = $7, sort_order = $8
-       where product_key = $1 returning product_key`,
-      [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.category_key), txt(b.image_url),
-       !!b.active, parseInt(b.sort_order, 10) || 0]);
-    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
-    return res.status(200).json({ ok: true });
-  }
-
-  if (req.method === "POST" && action === "price_save") {
-    const b = body(req);
-    const key = String(b.product_key || "");
-    const prices = b.prices || {};
-    if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
-    const exists = await pool.query("select 1 from site_products where product_key = $1", [key]);
-    if (!exists.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
-
-    const cols = [];
-    const vals = [];
-    for (const m of MONTHS) {
-      const row = prices[m] || {};
-      const price = num(row.price);
-      const sale = num(row.sale);
-      if (Number.isNaN(price) || Number.isNaN(sale)) {
-        return res.status(400).json({ ok: false, error: "Qiymət mənfi və ya düzgün olmayan rəqəmdir (" + m + " ay)." });
-      }
-      const saleOn = !!row.saleActive && sale !== null && sale > 0;
-      cols.push("price_" + m + "_month", "sale_" + m + "_price", "sale_" + m + "_active");
-      vals.push(price, sale, saleOn);
+  document.getElementById("loginBtn").onclick = async function () {
+    showMsg("");
+    try {
+      var r = await fetch("/api/admin?action=login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw.value })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) { showMsg(d.error || "Xəta baş verdi."); return; }
+      localStorage.setItem(KEY, d.token);
+      pw.value = "";
+      start();
+    } catch (e) {
+      showMsg("Xəta: " + String(e && e.message || e));
     }
-    const sets = cols.map((c, i) => c + " = $" + (i + 2)).join(", ");
-    const upd = await pool.query(
-      "update product_prices set " + sets + ", updated_at = now() where product_key = $1 returning product_key",
-      [key].concat(vals));
-    if (!upd.rowCount) {
-      const ph = cols.map((c, i) => "$" + (i + 3)).join(", ");
-      await pool.query(
-        "insert into product_prices (product_key, product_name, " + cols.join(", ") + ") " +
-        "values ($1, (select name_az from site_products where product_key = $1), " + ph + ")",
-        [key].concat(vals));
-    }
-    return res.status(200).json({ ok: true });
-  }
+  };
 
-  // ---------- KATEQORİYALAR ----------
-  if (req.method === "GET" && action === "categories") {
-    const r = await pool.query(
-      "select key, name_az, name_ru, name_en, icon, sort_order, active from categories order by sort_order, name_az");
-    return res.status(200).json({ ok: true, categories: r.rows });
-  }
+  nav.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-sec]");
+    if (b) go(b.getAttribute("data-sec"));
+  });
 
-  if (req.method === "POST" && action === "category_save") {
-    const b = body(req);
-    const key = String(b.key || "").trim();
-    const nameAz = txt(b.name_az);
-    if (!nameAz) return res.status(400).json({ ok: false, error: "Azərbaycanca ad daxil edin." });
-    const sort = parseInt(b.sort_order, 10) || 0;
-    const upd = await pool.query(
-      `update categories set name_az = $2, name_ru = $3, name_en = $4, icon = $5, sort_order = $6, active = $7
-       where key = $1 returning key`,
-      [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.icon), sort, !!b.active]);
-    if (upd.rowCount) return res.status(200).json({ ok: true });
-    if (!CAT_KEY_RE.test(key)) {
-      return res.status(400).json({ ok: false, error: "Açar yalnız kiçik latın hərfi, rəqəm və _ ola bilər (2–40 simvol)." });
-    }
-    await pool.query(
-      `insert into categories (key, name_az, name_ru, name_en, icon, sort_order, active)
-       values ($1, $2, $3, $4, $5, $6, $7)`,
-      [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.icon), sort, !!b.active]);
-    return res.status(200).json({ ok: true });
-  }
+  document.getElementById("menuBtn").onclick = function () { side.classList.toggle("open"); };
 
-  // ---------- FAQ ----------
-  if (req.method === "GET" && action === "faqs") {
-    const r = await pool.query(
-      "select id, question, answer, language, sort_order, active from site_faqs order by language, sort_order, created_at");
-    return res.status(200).json({ ok: true, faqs: r.rows });
-  }
+  logoutBtn.onclick = function () { localStorage.removeItem(KEY); showLogin(); showMsg("Çıxış edildi."); };
 
-  if (req.method === "POST" && action === "faq_save") {
-    const b = body(req);
-    const lang = String(b.language || "az");
-    const q = txt(b.question);
-    const a = txt(b.answer);
-    if (!FAQ_LANGS.includes(lang)) return res.status(400).json({ ok: false, error: "Dil yanlışdır." });
-    if (!q || !a) return res.status(400).json({ ok: false, error: "Sual və cavab daxil edin." });
-    const sort = parseInt(b.sort_order, 10) || 0;
-    if (b.id) {
-      const r = await pool.query(
-        `update site_faqs set question = $2, answer = $3, language = $4, sort_order = $5, active = $6
-         where id = $1 returning id`,
-        [String(b.id), q, a, lang, sort, !!b.active]);
-      if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sual tapılmadı." });
-      return res.status(200).json({ ok: true, id: r.rows[0].id });
-    }
-    const r = await pool.query(
-      `insert into site_faqs (question, answer, language, sort_order, active)
-       values ($1, $2, $3, $4, $5) returning id`,
-      [q, a, lang, sort, !!b.active]);
-    return res.status(200).json({ ok: true, id: r.rows[0].id });
-  }
-
-  if (req.method === "POST" && action === "faq_delete") {
-    const b = body(req);
-    const r = await pool.query("delete from site_faqs where id = $1 returning id", [String(b.id || "")]);
-    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sual tapılmadı." });
-    return res.status(200).json({ ok: true });
-  }
-
-  return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
-};
+  document.addEventListener("DOMContentLoaded", function () {
+    if (getTok()) start(); else showLogin();
+  });
+})();
