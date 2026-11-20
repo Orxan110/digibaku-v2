@@ -22,6 +22,7 @@
       return '<option value="' + k + '"' + (k === lang ? " selected" : "") + ">" + LANGS[k] + "</option>";
     }).join("");
     var title = isNew ? "Yeni sual" : (f.product_name ? esc(f.product_name) : "Ümumi");
+    var showG = !f || !f.product_key || f.show_global;
     return '<div class="card-box" data-faq="' + esc(isNew ? "" : f.id) + '" style="margin-bottom:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
       "<b>" + title + "</b>" +
@@ -30,6 +31,8 @@
       '<label class="muted" style="font-size:12px">Məhsul</label>' +
       '<select data-f="product_key" style="' + INP + ';margin-bottom:6px">' +
       prodOptions(f ? f.product_key || "" : "") + "</select>" +
+      '<label class="muted" style="font-size:13px;display:block;margin-bottom:8px">' +
+      '<input data-f="show_global" type="checkbox"' + (showG ? " checked" : "") + '> Ümumi FAQ səhifəsində də göstər</label>' +
       '<label class="muted" style="font-size:12px">Dil</label>' +
       '<select data-f="language" style="' + INP + ';margin-bottom:6px">' + langOpts + "</select>" +
       '<label class="muted" style="font-size:12px">Sual</label>' +
@@ -80,6 +83,7 @@
     var r = await api(PATH + "save", { method: "POST", body: {
       id: id,
       product_key: val(card, "product_key"),
+      show_global: val(card, "show_global"),
       language: val(card, "language"),
       question: val(card, "question"),
       answer: val(card, "answer"),
