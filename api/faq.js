@@ -1,6 +1,6 @@
 const { pool } = require("./_db");
 
-// /api/faq              -> ümumi FAQ (product_key boş olan)
+// /api/faq              -> ümumi FAQ (məhsulsuz olanlar + show_global işarəlilər)
 // /api/faq?product=KEY  -> həmin məhsulun FAQ-ları (KEY: product_key və ya slug)
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=60");
@@ -16,7 +16,8 @@ module.exports = async function handler(req, res) {
            order by sort_order, created_at`, [pk])
       : await pool.query(
           `select id, question, answer, language, sort_order, product_key
-           from site_faqs where active = true and product_key is null
+           from site_faqs
+           where active = true and (product_key is null or show_global = true)
            order by sort_order, created_at`);
     return res.status(200).json({ ok: true, faqs: r.rows });
   } catch (e) {
