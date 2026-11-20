@@ -2,7 +2,6 @@
   var LABELS = { pending: "Cavab gözləyir", confirmed: "Təsdiqləndi", processing: "Hazırlanır",
     completed: "Hazırdır", cancelled: "Ləğv edildi" };
   var STATUSES = Object.keys(LABELS);
-  var NEON = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
   var list = document.getElementById("list");
   var msg = document.getElementById("msg");
 
@@ -14,31 +13,19 @@
   function showMsg(t) { msg.textContent = t || ""; }
   function getTok() { return localStorage.getItem("digibaku_token") || ""; }
 
-  async function api(action, opts) {
+  async function api(path, opts) {
     opts = opts || {};
     var tk = getTok();
     if (!tk) return { ok: false, status: 401, data: { error: "Brauzerdə token yoxdur. Çıxış edib yenidən daxil olun." } };
     var headers = { Authorization: "Bearer " + tk };
     if (opts.body) headers["Content-Type"] = "application/json";
-    var r = await fetch("/api/admin?action=" + action, {
+    var r = await fetch(path, {
       method: opts.method || "GET",
       headers: headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined
     });
     var data = await r.json().catch(function () { return {}; });
     return { ok: r.ok, status: r.status, data: data };
-  }
-
-  // Diaqnostika: tokeni birbaşa Neon-a göndərib cavabı yoxlayır
-  async function neonCheck() {
-    var tk = getTok();
-    try {
-      var r = await fetch(NEON + "/get-session", { headers: { Authorization: "Bearer " + tk } });
-      var t = await r.text();
-      return "Neon get-session: [" + r.status + "] " + t.slice(0, 200);
-    } catch (e) {
-      return "Neon get-session xətası: " + String(e && e.message || e);
-    }
   }
 
   function render(orders) {
@@ -66,7 +53,7 @@
       b.onclick = async function () {
         var id = b.getAttribute("data-save");
         var sel = list.querySelector('select[data-id="' + id + '"]');
-        var r = await api("order_status", { method: "POST", body: { id: id, status: sel.value } });
+        var r = await api("/api/admin?action=order_status", { method: "POST", body: { id: id, status: sel.value } });
         if (!r.ok) { showMsg((r.data && r.data.error) || "Xəta baş verdi."); return; }
         showMsg("Yadda saxlandı: #" + id.slice(0, 8));
       };
@@ -75,17 +62,18 @@
 
   async function init() {
     try {
-      var me = await api("me");
+      var me = await api("/api/admin?action=me");
       if (me.status === 401) {
-        var check = await neonCheck();
+        var d = await api("/api/diag");
         list.innerHTML = '<div class="empty">Serverə daxil olmaq alınmadı.<br><br>' +
           "Server: " + esc((me.data && me.data.error) || "—") + "<br><br>" +
-          esc(check) + '<br><br><a href="login.html">Yenidən daxil olun</a></div>';
+          "Diaqnostika:<br>" + esc(JSON.stringify(d.data || {})) +
+          '<br><br><a href="login.html">Yenidən daxil olun</a></div>';
         return;
       }
       if (me.status === 403) { list.innerHTML = '<div class="empty">Bu hesabda admin icazəsi yoxdur.</div>'; return; }
       if (!me.ok) { showMsg((me.data && me.data.error) || "Xəta"); list.innerHTML = ""; return; }
-      var r = await api("orders");
+      var r = await api("/api/admin?action=orders");
       if (!r.ok) { showMsg((r.data && r.data.error) || "Sifarişlər yüklənmədi."); list.innerHTML = ""; return; }
       render(r.data.orders || []);
     } catch (e) {
