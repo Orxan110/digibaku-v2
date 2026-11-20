@@ -12,10 +12,17 @@
   }
   function showMsg(t) { msg.textContent = t || ""; }
 
+  // Diaqnostika: brauzerdə token varmı, neçə hissədən ibarətdir
+  function diag() {
+    var t = localStorage.getItem("digibaku_token") || "";
+    if (!t) return "Brauzerdə token yoxdur. Çıxış edib yenidən daxil olun.";
+    return "Token var (uzunluq " + t.length + ", hissə sayı " + t.split(".").length + ").";
+  }
+
   async function api(action, opts) {
     opts = opts || {};
     var tk = await DigiAuth.getToken();
-    if (!tk) return { ok: false, status: 401, data: { error: "Əvvəl daxil olun." } };
+    if (!tk) return { ok: false, status: 401, data: { error: "Token tapılmadı." } };
     var headers = { Authorization: "Bearer " + tk };
     if (opts.body) headers["Content-Type"] = "application/json";
     var r = await fetch("/api/admin?action=" + action, {
@@ -62,7 +69,12 @@
   async function init() {
     try {
       var me = await api("me");
-      if (me.status === 401) { list.innerHTML = '<div class="empty">Əvvəl <a href="login.html">daxil olun</a>.</div>'; return; }
+      if (me.status === 401) {
+        list.innerHTML = '<div class="empty">Serverə daxil olmaq alınmadı.<br><br>' +
+          esc(diag()) + "<br>Server cavabı: " + esc((me.data && me.data.error) || "—") +
+          '<br><br><a href="login.html">Yenidən daxil olun</a></div>';
+        return;
+      }
       if (me.status === 403) { list.innerHTML = '<div class="empty">Bu hesabda admin icazəsi yoxdur.</div>'; return; }
       if (!me.ok) { showMsg((me.data && me.data.error) || "Xəta"); list.innerHTML = ""; return; }
       var r = await api("orders");
