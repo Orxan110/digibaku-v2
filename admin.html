@@ -9,12 +9,16 @@
 </head>
 <body>
 <main class="wrap" style="padding-top:16px">
-  <h1 style="font-size:22px;margin-bottom:12px">Admin — Sifarişlər</h1>
+  <h1 style="font-size:22px;margin-bottom:12px">Admin</h1>
   <div id="login" class="card-box" style="display:none;max-width:420px">
     <label for="pw" class="muted">Admin şifrəsi</label>
     <input id="pw" type="password" autocomplete="current-password"
       style="width:100%;padding:12px;margin:8px 0 12px;border-radius:10px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5">
     <button id="loginBtn" class="btn gold" style="width:100%">Daxil ol</button>
+  </div>
+  <div id="tabs" style="display:none;gap:8px;margin-bottom:12px">
+    <button id="tabOrders" class="btn gold">Sifarişlər</button>
+    <button id="tabProducts" class="btn">Məhsullar</button>
   </div>
   <div id="msg" class="err"></div>
   <div id="list"><div class="empty">Yüklənir...</div></div>
