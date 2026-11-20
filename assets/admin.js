@@ -2,6 +2,7 @@
   var LABELS = { pending: "Cavab gözləyir", confirmed: "Təsdiqləndi", processing: "Hazırlanır",
     completed: "Hazırdır", cancelled: "Ləğv edildi" };
   var STATUSES = Object.keys(LABELS);
+  var NEON = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
   var list = document.getElementById("list");
   var msg = document.getElementById("msg");
 
@@ -11,10 +12,7 @@
     });
   }
   function showMsg(t) { msg.textContent = t || ""; }
-
-  function getTok() {
-    return localStorage.getItem("digibaku_token") || "";
-  }
+  function getTok() { return localStorage.getItem("digibaku_token") || ""; }
 
   async function api(action, opts) {
     opts = opts || {};
@@ -29,6 +27,18 @@
     });
     var data = await r.json().catch(function () { return {}; });
     return { ok: r.ok, status: r.status, data: data };
+  }
+
+  // Diaqnostika: tokeni birbaşa Neon-a göndərib cavabı yoxlayır
+  async function neonCheck() {
+    var tk = getTok();
+    try {
+      var r = await fetch(NEON + "/get-session", { headers: { Authorization: "Bearer " + tk } });
+      var t = await r.text();
+      return "Neon get-session: [" + r.status + "] " + t.slice(0, 200);
+    } catch (e) {
+      return "Neon get-session xətası: " + String(e && e.message || e);
+    }
   }
 
   function render(orders) {
@@ -67,9 +77,10 @@
     try {
       var me = await api("me");
       if (me.status === 401) {
+        var check = await neonCheck();
         list.innerHTML = '<div class="empty">Serverə daxil olmaq alınmadı.<br><br>' +
-          esc((me.data && me.data.error) || "—") +
-          '<br><br><a href="login.html">Yenidən daxil olun</a></div>';
+          "Server: " + esc((me.data && me.data.error) || "—") + "<br><br>" +
+          esc(check) + '<br><br><a href="login.html">Yenidən daxil olun</a></div>';
         return;
       }
       if (me.status === 403) { list.innerHTML = '<div class="empty">Bu hesabda admin icazəsi yoxdur.</div>'; return; }
