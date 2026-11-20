@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET" && action === "list") {
     const r = await pool.query(
       `select f.id, f.question, f.answer, f.language, f.sort_order, f.active, f.product_key,
-              p.name_az as product_name
+              f.show_global, p.name_az as product_name
        from site_faqs f
        left join site_products p on p.product_key = f.product_key
        order by f.language, f.sort_order, f.created_at`);
@@ -43,26 +43,29 @@ module.exports = async function handler(req, res) {
     const q = txt(b.question);
     const a = txt(b.answer);
     const pk = txt(b.product_key);
+    const showGlobal = !!b.show_global;
     if (!FAQ_LANGS.includes(lang)) return res.status(400).json({ ok: false, error: "Dil yanlışdır." });
     if (!q || !a) return res.status(400).json({ ok: false, error: "Sual və cavab daxil edin." });
     if (pk) {
       const ex = await pool.query("select 1 from site_products where product_key = $1", [pk]);
       if (!ex.rowCount) return res.status(400).json({ ok: false, error: "Məhsul tapılmadı." });
     }
+    // Məhsul seçilməyibsə, sual həmişə ümumi FAQ-da olur
+    const sg = pk ? showGlobal : true;
     const sort = parseInt(b.sort_order, 10) || 0;
     if (b.id) {
       const r = await pool.query(
         `update site_faqs set question = $2, answer = $3, language = $4, sort_order = $5,
-           active = $6, product_key = $7
+           active = $6, product_key = $7, show_global = $8
          where id = $1 returning id`,
-        [String(b.id), q, a, lang, sort, !!b.active, pk]);
+        [String(b.id), q, a, lang, sort, !!b.active, pk, sg]);
       if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sual tapılmadı." });
       return res.status(200).json({ ok: true, id: r.rows[0].id });
     }
     const r = await pool.query(
-      `insert into site_faqs (question, answer, language, sort_order, active, product_key)
-       values ($1, $2, $3, $4, $5, $6) returning id`,
-      [q, a, lang, sort, !!b.active, pk]);
+      `insert into site_faqs (question, answer, language, sort_order, active, product_key, show_global)
+       values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+      [q, a, lang, sort, !!b.active, pk, sg]);
     return res.status(200).json({ ok: true, id: r.rows[0].id });
   }
 
