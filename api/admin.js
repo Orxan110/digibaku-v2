@@ -1,26 +1,59 @@
-const { pool, getUserId } = require("./_db");
+const crypto = require("crypto");
+const { pool } = require("./_db");
 
 const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
 
-async function isAdmin(userId) {
-  const r = await pool.query(
-    "select 1 from admin_users where user_id = $1 and active = true limit 1", [userId]);
-  return r.rowCount > 0;
-}
-
 function body(req) {
   if (!req.body) return {};
-  if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch { return {}; } }
+  if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch (e) { return {}; } }
   return req.body;
+}
+
+function sign(payload) {
+  const secret = process.env.ADMIN_SECRET || "";
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = crypto.createHmac("sha256", secret).update(data).digest("base64url");
+  return data + "." + sig;
+}
+
+function verify(token) {
+  const secret = process.env.ADMIN_SECRET || "";
+  if (!secret || !token || token.indexOf(".") < 0) return null;
+  const parts = token.split(".");
+  const data = parts[0], sig = parts[1];
+  const expect = crypto.createHmac("sha256", secret).update(data).digest("base64url");
+  const a = Buffer.from(sig), b = Buffer.from(expect);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  let p;
+  try { p = JSON.parse(Buffer.from(data, "base64url").toString()); } catch (e) { return null; }
+  if (!p.exp || Date.now() > p.exp) return null;
+  return p;
+}
+
+function safeEq(x, y) {
+  const a = Buffer.from(String(x)), b = Buffer.from(String(y));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const userId = await getUserId(req);
-  if (!userId) return res.status(401).json({ ok: false, error: "Əvvəl daxil olun." });
-  if (!(await isAdmin(userId))) return res.status(403).json({ ok: false, error: "Admin icazəsi yoxdur." });
-
   const action = (req.query && req.query.action) || "";
+
+  // Admin girişi: şifrə Vercel environment-dən (ADMIN_PASSWORD) yoxlanır
+  if (req.method === "POST" && action === "login") {
+    const pass = process.env.ADMIN_PASSWORD || "";
+    if (!pass || !process.env.ADMIN_SECRET) {
+      return res.status(500).json({ ok: false, error: "ADMIN_PASSWORD və ya ADMIN_SECRET Vercel-də təyin olunmayıb." });
+    }
+    const b = body(req);
+    if (!safeEq(b.password || "", pass)) return res.status(401).json({ ok: false, error: "Şifrə yanlışdır." });
+    const token = sign({ role: "admin", exp: Date.now() + 12 * 60 * 60 * 1000 });
+    return res.status(200).json({ ok: true, token: token });
+  }
+
+  const h = req.headers.authorization || "";
+  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
+  if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   if (req.method === "GET" && action === "me") {
     return res.status(200).json({ ok: true, isAdmin: true });
