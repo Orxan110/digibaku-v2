@@ -1,10 +1,11 @@
 const { pool } = require("./_db");
 
 // Yalnız aktiv məhsullar. Qiyməti olmayan və ya 0 olan variant göstərilmir.
+// Endirim varsa: price = satış qiyməti, old = əvvəlki qiymət.
 const MONTHS = [1, 2, 3, 6, 12];
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+  res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=60");
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const cats = await pool.query(
@@ -29,15 +30,18 @@ module.exports = async function handler(req, res) {
       MONTHS.forEach(m => {
         const base = Number(r[`price_${m}_month`]);
         const sale = Number(r[`sale_${m}_price`]);
-        const saleOn = r[`sale_${m}_active`] === true;
-        const price = saleOn && sale > 0 ? sale : base;
-        if (price > 0) prices.push({ months: m, price: Number(price.toFixed(2)) });
+        const saleOn = r[`sale_${m}_active`] === true && sale > 0;
+        if (saleOn && base > 0 && sale < base) {
+          prices.push({ months: m, price: Number(sale.toFixed(2)), old: Number(base.toFixed(2)) });
+        } else if (base > 0) {
+          prices.push({ months: m, price: Number(base.toFixed(2)), old: null });
+        }
       });
       return {
         product_key: r.product_key,
         slug: r.slug || r.product_key,
         category_key: r.category_key,
-        name: { az: r.name_az || r.name, ru: r.name_ru, en: r.name_en },
+        name: { az: r.name_az || r.name_en, ru: r.name_ru, en: r.name_en },
         description: { az: r.description_az, ru: r.description_ru, en: r.description_en },
         features: { az: r.features_az || [], ru: r.features_ru || [], en: r.features_en || [] },
         image_url: r.image_url,
@@ -45,11 +49,7 @@ module.exports = async function handler(req, res) {
       };
     }).filter(p => p.prices.length > 0);
 
-    return res.status(200).json({
-      ok: true,
-      categories: cats.rows,
-      products
-    });
+    return res.status(200).json({ ok: true, categories: cats.rows, products });
   } catch (e) {
     console.error("products:", e);
     return res.status(500).json({ ok: false, error: "Məhsullar yüklənmədi." });
