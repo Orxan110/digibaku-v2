@@ -361,47 +361,4 @@
   async function start() {
     try {
       var me = await api("/api/admin?action=me");
-      if (me.status === 401) { localStorage.removeItem(KEY); showLogin(); showMsg(""); return; }
-      login.style.display = "none";
-      logoutBtn.style.display = "";
-      if (!CATS.length) {
-        var c = await api("/api/admin?action=products");
-        if (c.ok) CATS = c.data.categories || [];
-      }
-      go("orders");
-    } catch (e) {
-      showMsg("Xəta: " + String(e && e.message || e));
-    }
-  }
-
-  document.getElementById("loginBtn").onclick = async function () {
-    showMsg("");
-    try {
-      var r = await fetch("/api/admin?action=login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw.value })
-      });
-      var d = await r.json().catch(function () { return {}; });
-      if (!r.ok) { showMsg(d.error || "Xəta baş verdi."); return; }
-      localStorage.setItem(KEY, d.token);
-      pw.value = "";
-      start();
-    } catch (e) {
-      showMsg("Xəta: " + String(e && e.message || e));
-    }
-  };
-
-  nav.addEventListener("click", function (e) {
-    var b = e.target.closest("[data-sec]");
-    if (b) go(b.getAttribute("data-sec"));
-  });
-
-  document.getElementById("menuBtn").onclick = function () { side.classList.toggle("open"); };
-
-  logoutBtn.onclick = function () { localStorage.removeItem(KEY); showLogin(); showMsg("Çıxış edildi."); };
-
-  document.addEventListener("DOMContentLoaded", function () {
-    if (getTok()) start(); else showLogin();
-  });
-})();
+      if
