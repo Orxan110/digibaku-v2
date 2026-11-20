@@ -4,15 +4,18 @@
     completed: "Hazırdır", cancelled: "Ləğv edildi" };
   var STATUSES = Object.keys(LABELS);
   var MONTHS = [1, 2, 3, 6, 12];
+  var TITLES = { orders: "Sifarişlər", products: "Məhsullar" };
   var INP = "width:100%;padding:9px;border-radius:10px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5;box-sizing:border-box";
 
   var list = document.getElementById("list");
   var msg = document.getElementById("msg");
   var login = document.getElementById("login");
   var pw = document.getElementById("pw");
-  var tabs = document.getElementById("tabs");
-  var tabOrders = document.getElementById("tabOrders");
-  var tabProducts = document.getElementById("tabProducts");
+  var side = document.getElementById("side");
+  var nav = document.getElementById("nav");
+  var secTitle = document.getElementById("secTitle");
+  var logoutBtn = document.getElementById("logoutBtn");
+  var CATS = [];
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -37,14 +40,26 @@
     return { ok: r.ok, status: r.status, data: data };
   }
 
-  function showLogin() { login.style.display = ""; tabs.style.display = "none"; list.innerHTML = ""; }
+  function setActive(sec) {
+    nav.querySelectorAll("[data-sec]").forEach(function (b) {
+      b.className = "ad-link" + (b.getAttribute("data-sec") === sec ? " on" : "");
+    });
+    secTitle.textContent = TITLES[sec] || "Admin";
+    side.classList.remove("open");
+  }
+
+  function showLogin() {
+    login.style.display = "";
+    logoutBtn.style.display = "none";
+    list.innerHTML = "";
+    secTitle.textContent = "Admin girişi";
+  }
   function expired() { localStorage.removeItem(KEY); showLogin(); showMsg("Sessiya bitib. Yenidən daxil olun."); }
 
-  function setTab(name) {
-    tabOrders.className = "btn" + (name === "orders" ? " gold" : "");
-    tabProducts.className = "btn" + (name === "products" ? " gold" : "");
+  function go(sec) {
+    setActive(sec);
     showMsg("");
-    if (name === "orders") loadOrders(); else loadProducts();
+    if (sec === "orders") loadOrders(); else loadProducts();
   }
 
   // ---------- SİFARİŞLƏR ----------
@@ -64,8 +79,7 @@
         esc(new Date(o.created_at).toLocaleString("az-AZ")) + "</p>" +
         '<p style="margin:6px 0">' + items + "</p>" +
         '<div style="display:flex;gap:8px;align-items:center">' +
-        '<select data-id="' + esc(o.id) + '" style="flex:1;padding:10px;border-radius:10px;background:#1a1a1a;color:#f5f5f5;border:1px solid #262626">' +
-        opts + "</select>" +
+        '<select data-id="' + esc(o.id) + '" style="' + INP + ';flex:1">' + opts + "</select>" +
         '<button class="btn gold" data-save="' + esc(o.id) + '">Saxla</button></div></div>';
     }).join("");
 
@@ -90,8 +104,6 @@
   }
 
   // ---------- MƏHSULLAR ----------
-  var CATS = [];
-
   function priceRow(p, m) {
     var price = p["price_" + m + "_month"];
     var sale = p["sale_" + m + "_price"];
@@ -186,8 +198,8 @@
       var me = await api("/api/admin?action=me");
       if (me.status === 401) { localStorage.removeItem(KEY); showLogin(); showMsg(""); return; }
       login.style.display = "none";
-      tabs.style.display = "flex";
-      setTab("orders");
+      logoutBtn.style.display = "";
+      go("orders");
     } catch (e) {
       showMsg("Xəta: " + String(e && e.message || e));
     }
@@ -211,8 +223,14 @@
     }
   };
 
-  tabOrders.onclick = function () { setTab("orders"); };
-  tabProducts.onclick = function () { setTab("products"); };
+  nav.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-sec]");
+    if (b) go(b.getAttribute("data-sec"));
+  });
+
+  document.getElementById("menuBtn").onclick = function () { side.classList.toggle("open"); };
+
+  logoutBtn.onclick = function () { localStorage.removeItem(KEY); showLogin(); showMsg("Çıxış edildi."); };
 
   document.addEventListener("DOMContentLoaded", function () {
     if (getTok()) start(); else showLogin();
