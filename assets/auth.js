@@ -1,7 +1,6 @@
-/* DigiBaku — Neon Auth client. Sessiya tokeni localStorage-da saxlanılır, cookie blok olsa da işləyir. */
+/* DigiBaku — Neon Auth client. Giriş birbaşa Neon ünvanına gedir. */
 (function () {
   var AUTH_BASE = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
-  var TOKEN_KEY = "digibaku_token";
 
   var MESSAGES = {
     az: { invalidEmail: "E-poçt düzgün deyil.", shortPassword: "Şifrə ən azı 8 simvol olmalıdır.",
@@ -31,27 +30,13 @@
   function validateEmail(email) { return EMAIL_RE.test(String(email || "").trim()); }
   function validatePassword(password) { return typeof password === "string" && password.length >= 8; }
 
-  function getToken() {
-    try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
-  }
-  function saveToken(t) {
-    try { if (t) localStorage.setItem(TOKEN_KEY, t); } catch (e) {}
-  }
-  function clearToken() {
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
-  }
-
   async function call(path, body, method) {
-    var headers = { "Content-Type": "application/json" };
-    var tk = getToken();
-    if (tk) headers.Authorization = "Bearer " + tk;
-
     var res;
     try {
       res = await fetch(AUTH_BASE + path, {
         method: method || "POST",
         credentials: "include",
-        headers: headers,
+        headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined
       });
     } catch (e) {
@@ -79,7 +64,6 @@
       if (!validatePassword(password)) return { ok: false, error: msg("shortPassword") };
       var r = await call("/sign-up/email", { name: name.trim(), email: email.trim(), password: password });
       if (!r.ok) return r;
-      if (r.data && r.data.token) saveToken(r.data.token);
       return { ok: true, message: msg("registered"), data: r.data };
     },
     async login(opts) {
@@ -88,23 +72,18 @@
       if (!password) return { ok: false, error: msg("shortPassword") };
       var r = await call("/sign-in/email", { email: email.trim(), password: password });
       if (!r.ok) return r;
-      if (r.data && r.data.token) saveToken(r.data.token);
       return { ok: true, message: msg("loggedIn"), data: r.data };
     },
     async logout() {
-      await call("/sign-out", {});
-      clearToken();
-      return { ok: true, message: msg("loggedOut") };
+      var r = await call("/sign-out", {});
+      return r.ok ? { ok: true, message: msg("loggedOut") } : r;
     },
     async getSession() {
       var r = await call("/get-session", null, "GET");
       if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };
       return { ok: true, session: r.data };
     },
-    // Sifariş API-si üçün: saxlanmış token varsa onu qaytarır
     async getToken() {
-      var tk = getToken();
-      if (tk) return tk;
       try {
         var res = await fetch(AUTH_BASE + "/token", { credentials: "include" });
         if (!res.ok) return null;
