@@ -1,25 +1,24 @@
-
-/* DigiBaku — məhsul səhifəsi: müddət seçimi, ad + WhatsApp nömrəsi, WhatsApp ilə sifariş, sabit panel */
+/* DigiBaku — məhsul səhifəsi: müddət seçimi, endirim, ad + WhatsApp nömrəsi, WhatsApp ilə sifariş */
 (function () {
   var TX = {
     az: { back: "← Məhsullara qayıt", notFound: "Məhsul tapılmadı.", loadErr: "Məhsul yüklənmədi. Səhifəni yeniləyin.",
       plans: "Müddət seçin", month: "ay", nameLbl: "Adınız", namePh: "Ad və soyad",
       phoneLbl: "WhatsApp nömrəniz", phonePh: "+994 50 000 00 00", orderBtn: "WhatsApp-la sifariş et",
       errName: "Ad daxil edin.", errPhone: "Düzgün WhatsApp nömrəsi daxil edin.", noImg: "Şəkil yoxdur",
-      waIntro: "Salam, sifariş vermək istəyirəm.", waProduct: "Məhsul", waPlan: "Müddət", waPrice: "Qiymət",
-      waName: "Ad", waPhone: "Nömrə", stickyTo: "Ümumi" },
+      sale: "Endirim", waIntro: "Salam, sifariş vermək istəyirəm.", waProduct: "Məhsul", waPlan: "Müddət",
+      waPrice: "Qiymət", waName: "Ad", waPhone: "Nömrə", stickyTo: "Ümumi" },
     ru: { back: "← Назад к товарам", notFound: "Товар не найден.", loadErr: "Не удалось загрузить товар. Обновите страницу.",
       plans: "Выберите срок", month: "мес.", nameLbl: "Ваше имя", namePh: "Имя и фамилия",
       phoneLbl: "Ваш номер WhatsApp", phonePh: "+994 50 000 00 00", orderBtn: "Заказать в WhatsApp",
       errName: "Введите имя.", errPhone: "Введите правильный номер WhatsApp.", noImg: "Нет изображения",
-      waIntro: "Здравствуйте, хочу оформить заказ.", waProduct: "Товар", waPlan: "Срок", waPrice: "Цена",
-      waName: "Имя", waPhone: "Номер", stickyTo: "Итого" },
+      sale: "Скидка", waIntro: "Здравствуйте, хочу оформить заказ.", waProduct: "Товар", waPlan: "Срок",
+      waPrice: "Цена", waName: "Имя", waPhone: "Номер", stickyTo: "Итого" },
     en: { back: "← Back to products", notFound: "Product not found.", loadErr: "Product could not be loaded. Please refresh.",
       plans: "Choose duration", month: "mo", nameLbl: "Your name", namePh: "Full name",
       phoneLbl: "Your WhatsApp number", phonePh: "+994 50 000 00 00", orderBtn: "Order via WhatsApp",
       errName: "Please enter your name.", errPhone: "Please enter a valid WhatsApp number.", noImg: "No image",
-      waIntro: "Hello, I would like to place an order.", waProduct: "Product", waPlan: "Duration", waPrice: "Price",
-      waName: "Name", waPhone: "Number", stickyTo: "Total" }
+      sale: "Sale", waIntro: "Hello, I would like to place an order.", waProduct: "Product", waPlan: "Duration",
+      waPrice: "Price", waName: "Name", waPhone: "Number", stickyTo: "Total" }
   };
 
   var lang = DB.lang;
@@ -37,6 +36,11 @@
     ".plan.on{border-color:var(--gold);background:var(--card2)}" +
     ".plan .m{font-size:16px;font-weight:600}" +
     ".plan .p{color:var(--gold);font-size:16px;margin-top:4px}" +
+    ".old{color:var(--muted);text-decoration:line-through;font-size:13px;margin-right:6px}" +
+    ".sale{display:inline-block;background:var(--gold);color:#000;font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px;margin-left:8px;vertical-align:middle}" +
+    ".sumline{display:flex;align-items:baseline;gap:10px;margin:18px 0 12px;flex-wrap:wrap}" +
+    ".sumline .big{color:var(--gold);font-size:30px;font-weight:800}" +
+    ".sumline .mo{color:var(--muted)}" +
     ".order-box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;max-width:520px}" +
     ".order-box h3{font-size:18px;margin-bottom:12px}" +
     ".fld{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}" +
@@ -69,6 +73,10 @@
   function sorted(p) { return p.prices.slice().sort(function (a, b) { return a.months - b.months; }); }
   function pick(p, months) {
     return p.prices.filter(function (x) { return x.months === months; })[0] || null;
+  }
+  function priceHtml(x, cls) {
+    return (x.old ? '<span class="old">' + x.old.toFixed(2) + "</span>" : "") +
+      '<span class="' + cls + '">' + x.price.toFixed(2) + " AZN</span>";
   }
   function validPhone(v) {
     var d = String(v || "").replace(/[\s\-()]/g, "");
@@ -105,7 +113,7 @@
     var plans = sorted(p).map(function (x) {
       return '<button type="button" class="plan' + (x.months === state.months ? " on" : "") + '" data-m="' + x.months + '">' +
         '<div class="m">' + x.months + " " + esc(t.month) + "</div>" +
-        '<div class="p">' + x.price.toFixed(2) + " AZN</div></button>";
+        '<div class="p">' + priceHtml(x, "") + "</div></button>";
     }).join("");
 
     box.innerHTML =
@@ -113,9 +121,11 @@
       '<div class="pd-grid">' +
         '<div><div class="pd-img">' + img + "</div></div>" +
         "<div>" +
-          '<h1 class="pd-title">' + esc(name) + "</h1>" +
+          '<h1 class="pd-title">' + esc(name) + (cur && cur.old ? '<span class="sale">' + esc(t.sale) + "</span>" : "") + "</h1>" +
           '<div class="pd-label">' + esc(t.plans) + "</div>" +
           '<div class="plans">' + plans + "</div>" +
+          '<div class="sumline"><span class="big">' + (cur ? priceHtml(cur, "") : "") +
+          '</span><span class="mo">· ' + state.months + " " + esc(t.month) + "</span></div>" +
           '<div class="order-box" id="orderBox">' +
             '<div class="fld"><label for="fName">' + esc(t.nameLbl) + '</label><input id="fName" type="text" autocomplete="name" placeholder="' + esc(t.namePh) + '" value="' + esc(state.name) + '"></div>' +
             '<div class="fld"><label for="fPhone">' + esc(t.phoneLbl) + '</label><input id="fPhone" type="tel" autocomplete="tel" placeholder="' + esc(t.phonePh) + '" value="' + esc(state.phone) + '"></div>' +
@@ -139,7 +149,7 @@
     bar.innerHTML =
       '<div class="sticky-inner">' +
         '<div><div class="lbl">' + esc(t.stickyTo) + " · " + state.months + " " + esc(t.month) + "</div>" +
-        '<div class="amt">' + (cur ? cur.price.toFixed(2) : "") + " AZN</div></div>" +
+        '<div class="amt">' + (cur ? priceHtml(cur, "") : "") + "</div></div>" +
         '<button type="button" class="btn gold" id="stickyOrder">' + esc(t.orderBtn) + "</button>" +
       "</div>";
     document.getElementById("stickyOrder").onclick = function () {
