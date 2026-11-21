@@ -1,4 +1,4 @@
-/* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri. */
+/* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO. */
 (function(){
   var T = {
     az:{home:"Ana səhifə",products:"Məhsullar",cart:"Səbət",orders:"Sifarişlər",profile:"Profilim",
@@ -203,11 +203,56 @@
     });
   }
 
+  // SEO: başlıq, təsvir, açar sözlər, Open Graph, canonical (admin paneldən)
+  var SEO_PAGES = { "": "home", "index": "home", "products": "products", "faq": "faq", "contact": "contact",
+    "about": "about", "rules": "rules", "privacy": "privacy", "terms": "terms" };
+  function setMeta(attr, name, content){
+    if(!content) return;
+    var el = document.head.querySelector("meta[" + attr + '="' + name + '"]');
+    if(!el){ el = document.createElement("meta"); el.setAttribute(attr, name); document.head.appendChild(el); }
+    el.setAttribute("content", content);
+  }
+  function applySeo(seo){
+    if(!seo) return;
+    var file = (location.pathname.split("/").pop() || "").replace(/\.html$/, "");
+    var key = SEO_PAGES[file];
+    if(!key) return;
+    var s = {};
+    [seo["default"] || {}, seo[key] || {}].forEach(function(src){
+      Object.keys(src).forEach(function(k){ if(src[k]) s[k] = src[k]; });
+    });
+    function g(f){ return s[f + "_" + lang] || s[f + "_az"] || ""; }
+    var title = g("title"), desc = g("desc"), kw = g("keywords");
+    if(title){
+      document.title = title;
+      setMeta("property", "og:title", title);
+      setMeta("name", "twitter:title", title);
+    }
+    if(desc){
+      setMeta("name", "description", desc);
+      setMeta("property", "og:description", desc);
+      setMeta("name", "twitter:description", desc);
+    }
+    if(kw) setMeta("name", "keywords", kw);
+    if(s.og_image){
+      var img = s.og_image.charAt(0) === "/" ? location.origin + s.og_image : s.og_image;
+      setMeta("property", "og:image", img);
+      setMeta("name", "twitter:image", img);
+    }
+    setMeta("property", "og:type", "website");
+    setMeta("property", "og:url", location.origin + location.pathname);
+    setMeta("name", "twitter:card", s.og_image ? "summary_large_image" : "summary");
+    var link = document.head.querySelector('link[rel="canonical"]');
+    if(!link){ link = document.createElement("link"); link.setAttribute("rel", "canonical"); document.head.appendChild(link); }
+    link.setAttribute("href", location.origin + location.pathname);
+  }
+
   function loadSettings(){
     fetch("/api/settings")
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d && d.settings){ DB.settings = d.settings; applySettings(); }
+        if(d && d.seo){ applySeo(d.seo); }
       })
       .catch(function(){});
   }
