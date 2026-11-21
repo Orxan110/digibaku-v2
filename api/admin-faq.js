@@ -37,8 +37,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, products: r.rows });
   }
 
-  if (req.method === "POST" && action === "save") {
-      if (req.method === "GET" && action === "content_get") {
+  if (req.method === "GET" && action === "content_get") {
     await ensureSchema();
     const pk = String((req.query && req.query.product_key) || "");
     const r = await pool.query("select * from product_content where product_key = $1", [pk]);
@@ -63,6 +62,8 @@ module.exports = async function handler(req, res) {
       [pk].concat(vals));
     return res.status(200).json({ ok: true });
   }
+
+  if (req.method === "POST" && action === "save") {
     const b = body(req);
     const lang = String(b.language || "az");
     const q = txt(b.question);
