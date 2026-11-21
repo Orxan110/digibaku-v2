@@ -38,6 +38,31 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "save") {
+      if (req.method === "GET" && action === "content_get") {
+    await ensureSchema();
+    const pk = String((req.query && req.query.product_key) || "");
+    const r = await pool.query("select * from product_content where product_key = $1", [pk]);
+    return res.status(200).json({ ok: true, content: r.rows[0] || {} });
+  }
+
+  if (req.method === "POST" && action === "content_save") {
+    await ensureSchema();
+    const b = body(req);
+    const pk = txt(b.product_key);
+    if (!pk) return res.status(400).json({ ok: false, error: "Məhsul seçin." });
+    const ex = await pool.query("select 1 from site_products where product_key = $1", [pk]);
+    if (!ex.rowCount) return res.status(400).json({ ok: false, error: "Məhsul tapılmadı." });
+    const cols = [];
+    ["about", "usage", "howto"].forEach(function (k) { FAQ_LANGS.forEach(function (l) { cols.push(k + "_" + l); }); });
+    const vals = cols.map(function (c) { return txt(b[c]); });
+    const sets = cols.map(function (c, i) { return c + " = $" + (i + 2); }).join(", ");
+    await pool.query(
+      "insert into product_content (product_key, " + cols.join(", ") + ") values ($1, " +
+      cols.map(function (c, i) { return "$" + (i + 2); }).join(", ") + ") " +
+      "on conflict (product_key) do update set " + sets + ", updated_at = now()",
+      [pk].concat(vals));
+    return res.status(200).json({ ok: true });
+  }
     const b = body(req);
     const lang = String(b.language || "az");
     const q = txt(b.question);
