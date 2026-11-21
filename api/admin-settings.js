@@ -4,14 +4,31 @@ const { verify } = require("./_auth");
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
   "whatsapp", "phone", "email", "instagram", "tiktok"];
+const PAGE_KEYS = ["about", "rules", "privacy", "terms"];
+const SEO_KEYS = ["default", "home", "products", "faq", "contact", "about", "rules", "privacy", "terms"];
+const LANGS = ["az", "ru", "en"];
 
 function body(req) {
   if (!req.body) return {};
   if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch (e) { return {}; } }
   return req.body;
 }
-function clean(v) {
-  return String(v == null ? "" : v).trim().slice(0, 200);
+function clean(v, max) {
+  return String(v == null ? "" : v).trim().slice(0, max || 200);
+}
+async function getVal(key) {
+  const r = await pool.query("select value from site_settings where key = $1", [key]);
+  return (r.rows[0] && r.rows[0].value) || null;
+}
+async function putVal(key, value) {
+  const cur = await pool.query("select 1 from site_settings where key = $1", [key]);
+  if (cur.rowCount) {
+    await pool.query("update site_settings set value = $2::jsonb, updated_at = now() where key = $1",
+      [key, JSON.stringify(value)]);
+  } else {
+    await pool.query("insert into site_settings (key, value, updated_at) values ($1, $2::jsonb, now())",
+      [key, JSON.stringify(value)]);
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -21,10 +38,11 @@ module.exports = async function handler(req, res) {
   if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   const action = (req.query && req.query.action) || "";
+  const q = req.query || {};
 
+  // ---------- Ümumi parametrlər ----------
   if (req.method === "GET" && action === "get") {
-    const r = await pool.query("select value from site_settings where key = 'general'");
-    return res.status(200).json({ ok: true, settings: (r.rows[0] && r.rows[0].value) || {} });
+    return res.status(200).json({ ok: true, settings: (await getVal("general")) || {} });
   }
 
   if (req.method === "POST" && action === "save") {
@@ -46,17 +64,53 @@ module.exports = async function handler(req, res) {
     if (next.tiktok && !/^https?:\/\//.test(next.tiktok)) {
       return res.status(400).json({ ok: false, error: "TikTok linki https:// ilə başlamalıdır." });
     }
+    await putVal("general", next);
+    return res.status(200).json({ ok: true });
+  }
 
-    const cur = await pool.query("select value from site_settings where key = 'general'");
-    if (cur.rowCount) {
-      await pool.query(
-        "update site_settings set value = $1::jsonb, updated_at = now() where key = 'general'",
-        [JSON.stringify(next)]);
-    } else {
-      await pool.query(
-        "insert into site_settings (key, value, updated_at) values ('general', $1::jsonb, now())",
-        [JSON.stringify(next)]);
+  // ---------- Səhifə mətnləri ----------
+  if (req.method === "GET" && action === "page_get") {
+    const key = String(q.key || "");
+    if (PAGE_KEYS.indexOf(key) < 0) return res.status(400).json({ ok: false, error: "Səhifə yanlışdır." });
+    return res.status(200).json({ ok: true, page: (await getVal("page_" + key)) || {} });
+  }
+
+  if (req.method === "POST" && action === "page_save") {
+    const b = body(req);
+    const key = String(b.key || "");
+    if (PAGE_KEYS.indexOf(key) < 0) return res.status(400).json({ ok: false, error: "Səhifə yanlışdır." });
+    const next = {};
+    LANGS.forEach(function (l) {
+      next["title_" + l] = clean(b["title_" + l], 150);
+      next["body_" + l] = clean(b["body_" + l], 20000);
+    });
+    await putVal("page_" + key, next);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ---------- SEO ----------
+  if (req.method === "GET" && action === "seo_get") {
+    return res.status(200).json({ ok: true, seo: (await getVal("seo")) || {} });
+  }
+
+  if (req.method === "POST" && action === "seo_save") {
+    const b = body(req);
+    const key = String(b.key || "");
+    if (SEO_KEYS.indexOf(key) < 0) return res.status(400).json({ ok: false, error: "Səhifə yanlışdır." });
+    const next = {};
+    LANGS.forEach(function (l) {
+      next["title_" + l] = clean(b["title_" + l], 120);
+      next["desc_" + l] = clean(b["desc_" + l], 320);
+      next["keywords_" + l] = clean(b["keywords_" + l], 300);
+    });
+    const img = clean(b.og_image, 300);
+    if (img && !(img.charAt(0) === "/" || /^https:\/\//.test(img))) {
+      return res.status(400).json({ ok: false, error: "Şəkil linki / və ya https:// ilə başlamalıdır." });
     }
+    next.og_image = img;
+    const all = (await getVal("seo")) || {};
+    all[key] = next;
+    await putVal("seo", all);
     return res.status(200).json({ ok: true });
   }
 
