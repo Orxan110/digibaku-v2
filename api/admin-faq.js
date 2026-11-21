@@ -1,4 +1,4 @@
-const { pool } = require("./_db");
+const { pool, ensureSchema } = require("./_db");
 const { verify } = require("./_auth");
 
 const FAQ_LANGS = ["az", "ru", "en"];
