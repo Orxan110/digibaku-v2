@@ -1,6 +1,8 @@
 const { pool } = require("./_db");
 
-// Sayt parametrləri (ictimai oxunuş). Mənbə: site_settings, key = 'general'
+// /api/settings            -> ümumi parametrlər + SEO
+// /api/settings?page=about -> səhifə mətni (about, rules, privacy, terms)
+const PAGE_KEYS = ["about", "rules", "privacy", "terms"];
 const DEFAULTS = {
   site_name: "DigiBaku.com",
   logo_text: "DigiBaku",
@@ -15,12 +17,29 @@ const DEFAULTS = {
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
+  const pageKey = req.query && req.query.page;
+
+  if (pageKey !== undefined) {
+    if (PAGE_KEYS.indexOf(String(pageKey)) < 0) return res.status(400).json({ ok: false, error: "Səhifə tapılmadı." });
+    try {
+      const r = await pool.query("select value from site_settings where key = $1", ["page_" + pageKey]);
+      return res.status(200).json({ ok: true, page: (r.rows[0] && r.rows[0].value) || {} });
+    } catch (e) {
+      console.error("settings page:", e);
+      return res.status(200).json({ ok: true, page: {} });
+    }
+  }
+
   try {
-    const r = await pool.query("select value from site_settings where key = 'general'");
-    const saved = r.rows[0] && r.rows[0].value ? r.rows[0].value : {};
-    return res.status(200).json({ ok: true, settings: Object.assign({}, DEFAULTS, saved) });
+    const r = await pool.query("select key, value from site_settings where key in ('general', 'seo')");
+    let saved = {}, seo = {};
+    r.rows.forEach(function (row) {
+      if (row.key === "general") saved = row.value || {};
+      if (row.key === "seo") seo = row.value || {};
+    });
+    return res.status(200).json({ ok: true, settings: Object.assign({}, DEFAULTS, saved), seo: seo });
   } catch (e) {
     console.error("settings:", e);
-    return res.status(200).json({ ok: true, settings: DEFAULTS });
+    return res.status(200).json({ ok: true, settings: DEFAULTS, seo: {} });
   }
 };
