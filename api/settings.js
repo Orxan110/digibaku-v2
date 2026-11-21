@@ -18,6 +18,20 @@ const DEFAULTS = {
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
   const pageKey = req.query && req.query.page;
+  
+  if (req.query && req.query.banners !== undefined) {
+    try {
+      const b = await pool.query(
+        `select id, title_az, title_ru, title_en, subtitle_az, subtitle_ru, subtitle_en,
+                cta_label_az, cta_label_ru, cta_label_en, cta_url, image_url
+         from banners where active = true
+         order by sort_order, created_at limit 5`);
+      return res.status(200).json({ ok: true, banners: b.rows });
+    } catch (e) {
+      console.error("banners:", e);
+      return res.status(500).json({ ok: false, error: "Bannerlər yüklənmədi." });
+    }
+  }
 
   if (pageKey !== undefined) {
     if (PAGE_KEYS.indexOf(String(pageKey)) < 0) return res.status(400).json({ ok: false, error: "Səhifə tapılmadı." });
