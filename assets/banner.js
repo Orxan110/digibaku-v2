@@ -5,7 +5,7 @@
     return b[key + "_" + lang] || b[key + "_az"] || "";
   }
 
-  fetch("/api/banners")
+  fetch("/api/settings?banners=1")
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var b = (d.banners || [])[0];
