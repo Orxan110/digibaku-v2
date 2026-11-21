@@ -1,4 +1,4 @@
-/* DigiBaku — Neon Auth client. Giriş birbaşa Neon ünvanına gedir. */
+/* DigiBaku — Neon Auth client. Sorğular /api/auth üzərindən keçir (cookie saytın öz domenində saxlanır). */
 (function () {
   var AUTH_BASE = "/api/auth";
 
