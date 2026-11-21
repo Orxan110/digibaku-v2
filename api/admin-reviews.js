@@ -1,5 +1,5 @@
 // v1
-const { pool } = require("./_db");
+const { pool, ensureSchema } = require("./_db");
 const { verify } = require("./_auth");
 
 const STATUSES = ["pending", "approved", "rejected"];
@@ -21,12 +21,15 @@ module.exports = async function handler(req, res) {
   if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   const action = (req.query && req.query.action) || "";
+  await ensureSchema();
 
   if (req.method === "GET" && action === "list") {
     const r = await pool.query(
-      `select id, author_name, rating, body_az, body_ru, body_en, review_date, status,
-              show_on_home, sort_order, source, created_at
-       from reviews order by created_at desc limit 300`);
+      `select r.id, r.author_name, r.rating, r.body_az, r.body_ru, r.body_en, r.review_date, r.status,
+              r.show_on_home, r.sort_order, r.source, r.created_at, r.product_key,
+              p.name_az as product_name
+       from reviews r left join site_products p on p.product_key = r.product_key
+       order by r.created_at desc limit 300`);
     return res.status(200).json({ ok: true, reviews: r.rows });
   }
 
@@ -37,11 +40,16 @@ module.exports = async function handler(req, res) {
     const rating = Math.min(5, Math.max(1, parseInt(b.rating, 10) || 5));
     if (!name || !bodyAz) return res.status(400).json({ ok: false, error: "Ad və Azərbaycanca mətn daxil edin." });
     const status = STATUSES.includes(b.status) ? b.status : "approved";
+    const pk = txt(b.product_key);
+    if (pk) {
+      const ex = await pool.query("select 1 from site_products where product_key = $1", [pk]);
+      if (!ex.rowCount) return res.status(400).json({ ok: false, error: "Məhsul tapılmadı." });
+    }
     const r = await pool.query(
-      `insert into reviews (author_name, rating, body_az, body_ru, body_en, review_date, status, show_on_home, source)
-       values ($1, $2, $3, $4, $5, coalesce($6::date, current_date), $7, $8, 'admin')
+      `insert into reviews (author_name, rating, body_az, body_ru, body_en, review_date, status, show_on_home, source, product_key)
+       values ($1, $2, $3, $4, $5, coalesce($6::date, current_date), $7, $8, 'admin', $9)
        returning id`,
-      [name, rating, bodyAz, txt(b.body_ru), txt(b.body_en), txt(b.review_date), status, !!b.show_on_home]);
+      [name, rating, bodyAz, txt(b.body_ru), txt(b.body_en), txt(b.review_date), status, !!b.show_on_home, pk]);
     return res.status(200).json({ ok: true, id: r.rows[0].id });
   }
 
