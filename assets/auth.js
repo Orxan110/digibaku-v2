@@ -1,6 +1,6 @@
 /* DigiBaku — Neon Auth client. Giriş birbaşa Neon ünvanına gedir. */
 (function () {
-  var AUTH_BASE = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
+  var AUTH_BASE = "/api/auth";
 
   var MESSAGES = {
     az: { invalidEmail: "E-poçt düzgün deyil.", shortPassword: "Şifrə ən azı 8 simvol olmalıdır.",
