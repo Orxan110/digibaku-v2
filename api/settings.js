@@ -2,6 +2,7 @@ const { pool } = require("./_db");
 
 // /api/settings            -> ümumi parametrlər + SEO
 // /api/settings?page=about -> səhifə mətni (about, rules, privacy, terms)
+// /api/settings?banners=1  -> ana səhifə bannerləri
 const PAGE_KEYS = ["about", "rules", "privacy", "terms"];
 const DEFAULTS = {
   site_name: "DigiBaku.com",
@@ -18,7 +19,7 @@ const DEFAULTS = {
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
   const pageKey = req.query && req.query.page;
-  
+
   if (req.query && req.query.banners !== undefined) {
     try {
       const b = await pool.query(
