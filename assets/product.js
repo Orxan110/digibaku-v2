@@ -1,4 +1,4 @@
-/* DigiBaku — məhsul səhifəsi: müddət seçimi, endirim, ad + WhatsApp nömrəsi, WhatsApp ilə sifariş */
+/* DigiBaku — məhsul səhifəsi: müddət seçimi, endirim, ad + WhatsApp nömrəsi, WhatsApp ilə sifariş (nömrə admin paneldən), sabit panel */
 (function () {
   var TX = {
     az: { back: "← Məhsullara qayıt", notFound: "Məhsul tapılmadı.", loadErr: "Məhsul yüklənmədi. Səhifəni yeniləyin.",
@@ -23,7 +23,6 @@
 
   var lang = DB.lang;
   var t = TX[lang] || TX.az;
-  var WA = "https://wa.me/994513626349";
 
   var css = ".pd-grid{display:grid;gap:18px;margin:18px 0}" +
     "@media(min-width:900px){.pd-grid{grid-template-columns:1fr 1fr;align-items:start}}" +
@@ -99,7 +98,9 @@
     if (!state.name.trim()) { err.textContent = t.errName; document.getElementById("fName").focus(); return; }
     if (!validPhone(state.phone)) { err.textContent = t.errPhone; document.getElementById("fPhone").focus(); return; }
     err.textContent = "";
-    window.open(WA + "?text=" + encodeURIComponent(waText(p, cur)), "_blank", "noopener");
+    var link = DB.waLink(waText(p, cur));
+    if (link === "#") { err.textContent = "WhatsApp nömrəsi hələ təyin olunmayıb."; return; }
+    window.open(link, "_blank", "noopener");
   }
 
   function draw() {
@@ -136,41 +137,4 @@
       "</div>";
 
     box.querySelectorAll("img[data-img]").forEach(function (im) {
-      im.addEventListener("error", function () { im.replaceWith(document.createTextNode(im.alt)); });
-    });
-    box.querySelectorAll("[data-m]").forEach(function (b) {
-      b.onclick = function () { state.months = Number(b.dataset.m); draw(); };
-    });
-    document.getElementById("fName").oninput = function (e) { state.name = e.target.value; };
-    document.getElementById("fPhone").oninput = function (e) { state.phone = e.target.value; };
-    document.getElementById("orderBtn").onclick = orderViaWhatsApp;
-
-    bar.style.display = "";
-    bar.innerHTML =
-      '<div class="sticky-inner">' +
-        '<div><div class="lbl">' + esc(t.stickyTo) + " · " + state.months + " " + esc(t.month) + "</div>" +
-        '<div class="amt">' + (cur ? priceHtml(cur, "") : "") + "</div></div>" +
-        '<button type="button" class="btn gold" id="stickyOrder">' + esc(t.orderBtn) + "</button>" +
-      "</div>";
-    document.getElementById("stickyOrder").onclick = function () {
-      document.getElementById("orderBox").scrollIntoView({ behavior: "smooth", block: "center" });
-      orderViaWhatsApp();
-    };
-  }
-
-  async function init() {
-    var r = await DBApi.get("/api/products");
-    if (!r.ok) { box.innerHTML = '<div class="empty">' + esc(t.loadErr) + "</div>"; return; }
-    var p = (r.data.products || []).filter(function (x) { return x.slug === slug; })[0];
-    if (!p) {
-      box.innerHTML = '<div class="empty">' + esc(t.notFound) + ' <a href="products.html">' + esc(t.back) + "</a></div>";
-      return;
-    }
-    document.title = (p.name[lang] || p.name.az) + " — DigiBaku";
-    state.product = p;
-    state.months = sorted(p)[0].months;
-    draw();
-  }
-
-  document.addEventListener("DOMContentLoaded", init);
-})();
+      im.addEventLi
