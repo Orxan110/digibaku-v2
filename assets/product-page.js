@@ -164,28 +164,3 @@
         '<div><div class="lbl">' + esc(t.stickyTo) + " · " + state.months + " " + esc(t.month) + "</div>" +
         '<div class="amt">' + (cur ? priceHtml(cur) : "") + "</div></div>" +
         '<button type="button" class="btn gold" id="stickyOrder">' + esc(t.orderBtn) + "</button>" +
-      "</div>";
-    document.getElementById("stickyOrder").onclick = function () {
-      document.getElementById("orderBox").scrollIntoView({ behavior: "smooth", block: "center" });
-      orderViaWhatsApp();
-    };
-  }
-
-  async function init() {
-    var res = await fetch("/api/products");
-    if (!res.ok) { showErr("API cavabı: " + res.status); return; }
-    var data = await res.json();
-    var p = (data.products || []).filter(function (x) { return x.slug === slug; })[0];
-    if (!p) {
-      box.setAttribute("data-ready", "1");
-      box.innerHTML = '<div class="empty">' + esc(t.notFound) + ' <a href="products.html">' + esc(t.back) + "</a></div>";
-      return;
-    }
-    document.title = nameOf(p) + " — DigiBaku";
-    state.product = p;
-    state.months = sorted(p)[0].months;
-    draw();
-  }
-
-  init().catch(showErr);
-})();
