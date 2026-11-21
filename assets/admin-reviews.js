@@ -6,12 +6,17 @@
   var PATH = "/api/admin-reviews?action=";
   var STATUS_LABEL = { pending: "Gözləyir", approved: "Təsdiqləndi", rejected: "Rədd edildi" };
   var FILTER = "pending";
+  var PRODUCTS = [];
 
   function stars(n) { return "★".repeat(n) + "☆".repeat(5 - n); }
 
   function addForm() {
     return '<div class="card-box" data-add="1" style="margin-bottom:12px">' +
       "<b>Yeni rəy əlavə et</b>" +
+      '<div style="margin-top:8px"><label class="muted" style="font-size:12px">Məhsul (boş = ümumi rəy)</label>' +
+      '<select data-f="product_key" style="' + INP + ';margin-bottom:6px"><option value="">— Ümumi —</option>' +
+      PRODUCTS.map(function (p) { return '<option value="' + esc(p.product_key) + '">' + esc(p.name_az) + "</option>"; }).join("") +
+      "</select></div>" +
       '<div style="margin-top:8px"><label class="muted" style="font-size:12px">Müştəri adı</label>' +
       '<input data-f="author_name" style="' + INP + ';margin-bottom:6px"></div>' +
       '<label class="muted" style="font-size:12px">Reytinq (1–5)</label>' +
@@ -41,10 +46,12 @@
     }
     btns += '<button class="btn" data-del="1" data-id="' + esc(r.id) + '" style="color:#f87171">Sil</button>';
     return '<div class="card-box" style="margin-bottom:10px">' +
-      '<div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(r.author_name) + "</b>" +
+      '<div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(r.author_name) +
+      (r.source === "customer" ? ' <span style="font-size:11px;background:#d4af37;color:#000;border-radius:999px;padding:2px 8px;margin-left:6px">Müştəri</span>' : "") + "</b>" +
       '<span class="muted" style="font-size:12px">' + esc(STATUS_LABEL[r.status] || r.status) + "</span></div>" +
       '<div style="color:#d4af37;margin:4px 0">' + stars(Number(r.rating) || 0) +
       ' <span class="muted" style="font-size:12px">' + esc(date) + "</span></div>" +
+      '<div class="muted" style="font-size:12px">Məhsul: ' + esc(r.product_name || "Ümumi") + "</div>" +
       '<p style="margin:6px 0;color:#d4d4d4">' + esc(text) + "</p>" +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' + btns + "</div></div>";
   }
@@ -91,6 +98,7 @@
     var r = await api(PATH + "add", { method: "POST", body: {
       author_name: val(card, "author_name"),
       rating: val(card, "rating"),
+      product_key: val(card, "product_key"),
       body_az: val(card, "body_az"),
       body_ru: val(card, "body_ru"),
       body_en: val(card, "body_en"),
@@ -106,6 +114,8 @@
 
   async function loadReviews() {
     list.innerHTML = '<div class="empty">Yüklənir...</div>';
+    var pr = await api("/api/admin-faq?action=products");
+    PRODUCTS = (pr.ok && pr.data.products) || [];
     var r = await api(PATH + "list");
     if (r.status === 401) { expired(); return; }
     if (!r.ok) { showMsg(fetchErr(r, "Rəylər yüklənmədi.")); list.innerHTML = ""; return; }
