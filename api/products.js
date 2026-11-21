@@ -1,7 +1,7 @@
 const { pool } = require("./_db");
 
-// Yalnız aktiv məhsullar. Qiyməti olmayan və ya 0 olan variant göstərilmir.
-// Endirim varsa: price = satış qiyməti, old = əvvəlki qiymət.
+// Yalnız aktiv məhsullar. Endirim varsa: price = satış qiyməti, old = əvvəlki qiymət.
+// Həmçinin ana səhifədə göstəriləcək təsdiqlənmiş rəylər (reviews).
 const MONTHS = [1, 2, 3, 6, 12];
 
 module.exports = async function handler(req, res) {
@@ -23,6 +23,13 @@ module.exports = async function handler(req, res) {
        left join product_prices pp on pp.product_key = p.product_key
        where p.active = true
        order by p.sort_order, p.name_az`
+    );
+    const reviews = await pool.query(
+      `select author_name, rating, body_az, body_ru, body_en, review_date
+       from reviews
+       where status = 'approved' and show_on_home = true
+       order by sort_order, review_date desc, created_at desc
+       limit 12`
     );
 
     const products = prods.rows.map(r => {
@@ -49,7 +56,12 @@ module.exports = async function handler(req, res) {
       };
     }).filter(p => p.prices.length > 0);
 
-    return res.status(200).json({ ok: true, categories: cats.rows, products });
+    return res.status(200).json({
+      ok: true,
+      categories: cats.rows,
+      products,
+      reviews: reviews.rows
+    });
   } catch (e) {
     console.error("products:", e);
     return res.status(500).json({ ok: false, error: "Məhsullar yüklənmədi." });
