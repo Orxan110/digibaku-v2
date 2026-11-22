@@ -38,7 +38,11 @@
     var text = r.body_az || r.body_ru || r.body_en || "";
     var date = r.review_date ? String(r.review_date).slice(0, 10) : "";
     var btns = "";
-    if (r.status !== "approved") btns += '<button class="btn gold" data-st="approved" data-id="' + esc(r.id) + '">Təsdiqlə</button>';
+    if (r.status !== "approved") {
+      btns += '<button class="btn gold" data-st="approved" data-id="' + esc(r.id) + '">' +
+        (r.product_key ? "Təsdiqlə (məhsul səhifəsində)" : "Təsdiqlə") + "</button>";
+      if (r.product_key) btns += '<button class="btn" data-sthome="1" data-id="' + esc(r.id) + '">Təsdiqlə + ana səhifədə də göstər</button>';
+    }
     if (r.status !== "rejected") btns += '<button class="btn" data-st="rejected" data-id="' + esc(r.id) + '">Rədd et</button>';
     if (r.status === "approved") {
       btns += '<button class="btn" data-home="' + (r.show_on_home ? "0" : "1") + '" data-id="' + esc(r.id) + '">' +
@@ -51,7 +55,8 @@
       '<span class="muted" style="font-size:12px">' + esc(STATUS_LABEL[r.status] || r.status) + "</span></div>" +
       '<div style="color:#d4af37;margin:4px 0">' + stars(Number(r.rating) || 0) +
       ' <span class="muted" style="font-size:12px">' + esc(date) + "</span></div>" +
-      '<div class="muted" style="font-size:12px">Məhsul: ' + esc(r.product_name || "Ümumi") + "</div>" +
+      '<div class="muted" style="font-size:12px">Məhsul: <b style="color:#d4af37">' + esc(r.product_name || "Ümumi") + "</b> · Görünəcək yer: " +
+      esc((r.product_key ? "məhsulun öz səhifəsi" : "yalnız ana səhifə (ümumi rəy)") + (r.status === "approved" && r.show_on_home ? " + ana səhifə" : "")) + "</div>" +
       '<p style="margin:6px 0;color:#d4d4d4">' + esc(text) + "</p>" +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' + btns + "</div></div>";
   }
@@ -74,6 +79,15 @@
     if (addBtn) addBtn.onclick = addReview;
     list.querySelectorAll("[data-st]").forEach(function (b) {
       b.onclick = function () { act("status", { id: b.getAttribute("data-id"), status: b.getAttribute("data-st") }); };
+    });
+    list.querySelectorAll("[data-sthome]").forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.getAttribute("data-id");
+        var a = await api(PATH + "status", { method: "POST", body: { id: id, status: "approved" } });
+        if (a.status === 401) { expired(); return; }
+        if (!a.ok) { showMsg(fetchErr(a, "Əməliyyat alınmadı.")); return; }
+        await act("home", { id: id, show_on_home: true });
+      };
     });
     list.querySelectorAll("[data-home]").forEach(function (b) {
       b.onclick = function () { act("home", { id: b.getAttribute("data-id"), show_on_home: b.getAttribute("data-home") === "1" }); };
