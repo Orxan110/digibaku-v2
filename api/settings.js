@@ -16,9 +16,55 @@ const DEFAULTS = {
   tiktok: ""
 };
 
+const SITEMAP_PAGES = ["", "products", "faq", "contact", "about", "rules", "privacy", "terms"];
+
+function siteOrigin(req) {
+  if (process.env.SITE_URL) return String(process.env.SITE_URL).replace(/\/+$/, "");
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  return host ? "https://" + host : "";
+}
+
+function xmlEsc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+async function feed(req, res, kind) {
+  const origin = siteOrigin(req);
+  if (kind === "robots") {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+    return res.status(200).send(
+      "User-agent: *\nAllow: /\n\n" + (origin ? "Sitemap: " + origin + "/sitemap.xml\n" : ""));
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = SITEMAP_PAGES.map(function (p) {
+    return { loc: origin + "/" + p, freq: p === "" ? "daily" : "weekly", prio: p === "" ? "1.0" : (p === "products" ? "0.9" : "0.5") };
+  });
+  try {
+    const r = await pool.query(
+      "select coalesce(slug, product_key) as slug from site_products where active = true order by sort_order, name_az");
+    r.rows.forEach(function (row) {
+      if (row.slug) urls.push({ loc: origin + "/product?slug=" + encodeURIComponent(row.slug), freq: "weekly", prio: "0.8" });
+    });
+  } catch (e) {
+    console.error("sitemap:", e);
+  }
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    urls.map(function (u) {
+      return "  <url><loc>" + xmlEsc(u.loc) + "</loc><lastmod>" + today + "</lastmod><changefreq>" + u.freq +
+        "</changefreq><priority>" + u.prio + "</priority></url>";
+    }).join("\n") + "\n</urlset>\n";
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+  return res.status(200).send(xml);
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
   const pageKey = req.query && req.query.page;
+  const feedKind = req.query && req.query.feed;
+  if (feedKind === "sitemap" || feedKind === "robots") return feed(req, res, feedKind);
 
   if (req.query && req.query.banners !== undefined) {
     try {
