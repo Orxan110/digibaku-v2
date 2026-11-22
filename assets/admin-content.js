@@ -24,7 +24,9 @@
       return '<option value="' + esc(p.product_key) + '"' + (p.product_key === CUR ? " selected" : "") + ">" + esc(p.name_az) + "</option>";
     }).join("");
     var html = '<div class="card-box" style="margin-bottom:12px">' +
-      '<p class="muted" style="font-size:13px;margin-bottom:8px">Hər məhsul üçün öz mətnləri yazılır. Boş qalan hissə saytda “tezliklə əlavə olunacaq” kimi görünür.</p>' +
+      '<p class="muted" style="font-size:13px;margin-bottom:8px">Hər məhsul üçün öz mətnləri yazılır. Boş qalan “İstifadə qaydaları” və “Necə sifariş edim?” hissələrində saytın standart mətni göstərilir.</p>' +
+      '<p class="muted" style="font-size:13px;margin-bottom:8px"><b>Qısa / ətraflı:</b> əvvəl qısa mətni yazın, sonra ayrıca bir sətirdə <b>---</b> yazıb ətraflı hissəni əlavə edin. Saytda qısa hissə görünür, “Daha çox göstər” basılanda ətraflı hissə açılır. <b>---</b> yazmasanız, sayt mətni özü qısaldır.</p>' +
+      '<p class="muted" style="font-size:13px;margin-bottom:8px">Format: boş sətirlə abzas ayrılır; “Başlıq:” ilə bitən sətir başlıq olur; “- ” və ya “1) ” ilə başlayan sətirlər siyahı olur.</p>' +
       '<select id="cProd" style="' + INP + '">' + opts + "</select></div>";
     if (CUR) {
       html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
