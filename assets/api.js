@@ -1,8 +1,12 @@
 window.DBApi = {
+  // Giriş tələb edən endpointlər: sifarişlər və rəy göndərmə
+  isPrivate(url) {
+    return url.indexOf("/api/orders") === 0 || /^\/api\/shop\?(?:.*&)?action=review(?:&|$)/.test(url);
+  },
   async authHeaders(url) {
     var h = {};
     // Yalnız şəxsi endpointlər üçün token alınır (məhsullar gözləmir)
-    if (url.indexOf("/api/orders") !== 0) return h;
+    if (!this.isPrivate(url)) return h;
     try {
       if (window.DigiAuth && DigiAuth.getToken) {
         var t = await DigiAuth.getToken();
