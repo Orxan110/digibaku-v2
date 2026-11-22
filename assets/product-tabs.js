@@ -1,4 +1,5 @@
-/* Məhsul səhifəsi tabları: Məhsul haqqında / İstifadə qaydaları / Necə sifariş edim? / Rəylər
+/* Məhsul səhifəsi tabları: Məhsul haqqında / İstifadə qaydaları / Necə sifariş edim?
+   Rəylər artıq tab deyil: tabların altında həmişə görünən ayrıca bölmədir (yalnız bu məhsulun təsdiqlənmiş rəyləri).
    - Hər bölmədə əvvəl QISA görünüş, "Daha çox göstər" ilə ƏTRAFLI görünüş açılır.
    - Admin mətnində tək sətirdə --- yazılırsa: ondan əvvəlki hissə qısa, sonrakı hissə ətraflı olur.
      --- yoxdursa sayt mətni özü qısaldır.
@@ -82,12 +83,13 @@
     }
   };
 
-  var TABS = ["about", "usage", "howto", "reviews"];
+  var TABS = ["about", "usage", "howto"];
   var SHOW_REVIEWS = 3;
   var DRAFT_KEY = "digibaku_rv_" + slug;
 
   var data = null, loading = false;
   var active = TABS.indexOf(params.get("tab")) >= 0 ? params.get("tab") : "about";
+  var scrolled = false;
   var user = undefined;            // undefined = yoxlanılır, null = daxil olmayıb
   var rating = 0, sentMsg = "", authLost = false, expanded = {};
 
@@ -338,6 +340,15 @@
       return '<button type="button" role="tab" data-tab="' + k + '" aria-selected="' + (k === active) + '" class="' + (k === active ? "on" : "") + '">' + esc(t[k]) + "</button>";
     }).join("") + '</div><div class="ptabs-body" id="ptPanel" role="tabpanel"></div>';
     sec.addEventListener("click", onClick);
+    return sec;
+  }
+
+  function buildReviews() {
+    var sec = document.createElement("section");
+    sec.id = "pReviews";
+    sec.className = "ptabs";
+    sec.innerHTML = '<h2 style="font-size:20px;margin-bottom:12px" id="rvHead">' + esc(t.reviews) + '</h2><div class="ptabs-body" id="rvPanel"></div>';
+    sec.addEventListener("click", onClick);
     sec.addEventListener("input", onInput);
     return sec;
   }
@@ -346,16 +357,24 @@
     var panel = sec.querySelector("#ptPanel");
     if (!panel) return;
     if (!data) { panel.innerHTML = '<div class="muted">...</div>'; return; }
-    panel.innerHTML = active === "reviews" ? reviewsHtml() : sectionHtml(active);
-    var rb = sec.querySelector('[data-tab="reviews"]');
-    if (rb) rb.textContent = t.reviews + (data.stats && data.stats.count ? " (" + data.stats.count + ")" : "");
+    panel.innerHTML = sectionHtml(active);
+  }
+
+  function paintReviews() {
+    var rs = document.getElementById("pReviews");
+    var panel = rs && rs.querySelector("#rvPanel");
+    if (!panel) return;
+    if (!data) { panel.innerHTML = '<div class="muted">...</div>'; return; }
+    panel.innerHTML = reviewsHtml();
+    var h = rs.querySelector("#rvHead");
+    if (h) h.textContent = t.reviews + (data.stats && data.stats.count ? " (" + data.stats.count + ")" : "");
   }
 
   function onClick(e) {
-    var sec = document.getElementById("pTabs");
-    if (!sec) return;
     var el = e.target.closest("[data-tab],[data-more],[data-star],#rvSend,[data-keepdraft]");
     if (!el) return;
+    var sec = el.closest("#pTabs") || el.closest("#pReviews");
+    if (!sec) return;
 
     if (el.hasAttribute("data-tab")) {
       active = el.getAttribute("data-tab");
@@ -410,12 +429,12 @@
     if (r.status === 401) {
       // Səhifədən atmırıq: rəy qaralamada saxlanılır, istifadəçi özü yenidən daxil olur
       authLost = true;
-      paint(sec);
+      paintReviews();
       var w = sec.querySelector(".pt-warn");
       if (w && w.scrollIntoView) w.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
-    if (r.status === 409) { lsDel(DRAFT_KEY); sentMsg = t.dup; paint(sec); return; }
+    if (r.status === 409) { lsDel(DRAFT_KEY); sentMsg = t.dup; paintReviews(); return; }
     if (!r.ok) {
       btn.disabled = false;
       btn.textContent = t.send;
@@ -426,7 +445,7 @@
     rating = 0;
     authLost = false;
     sentMsg = t.sent;
-    paint(sec);
+    paintReviews();
   }
 
   function emptyContent() { return { about: {}, usage: {}, howto: {} }; }
@@ -436,6 +455,8 @@
     var sec = build();
     box.appendChild(sec);
     paint(sec);
+    box.appendChild(buildReviews());
+    paintReviews();
     if (data === null && !loading) {
       loading = true;
       fetch("/api/shop?action=extra&product=" + encodeURIComponent(slug))
@@ -444,13 +465,22 @@
           data = { content: d.content || emptyContent(), reviews: d.reviews || [], stats: d.stats || { count: 0, avg: 0 } };
         })
         .catch(function () { data = { content: emptyContent(), reviews: [], stats: { count: 0, avg: 0 } }; })
-        .then(function () { loading = false; var s = document.getElementById("pTabs"); if (s) paint(s); });
+        .then(function () {
+          loading = false;
+          var s = document.getElementById("pTabs"); if (s) paint(s);
+          paintReviews();
+          if (params.get("tab") === "reviews" && !scrolled) {
+            scrolled = true;
+            var rs = document.getElementById("pReviews");
+            if (rs && rs.scrollIntoView) rs.scrollIntoView({ block: "start" });
+          }
+        });
     }
     if (user === undefined && window.DigiAuth) {
       DigiAuth.getSession().then(function (r) {
         user = r && r.session ? r.session.user : null;
-        var s = document.getElementById("pTabs"); if (s && data && active === "reviews") paint(s);
-      }).catch(function () { user = null; });
+        paintReviews();
+      }).catch(function () { user = null; paintReviews(); });
     }
   }
 
