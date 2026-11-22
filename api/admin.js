@@ -5,6 +5,8 @@ const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"
 const MONTHS = [1, 2, 3, 6, 12];
 const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
 const FAQ_LANGS = ["az", "ru", "en"];
+const loginTries = globalThis.digibakuLoginTries || new Map();
+globalThis.digibakuLoginTries = loginTries;
 
 function body(req) {
   if (!req.body) return {};
@@ -56,11 +58,27 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "POST" && action === "login") {
     const pass = process.env.ADMIN_PASSWORD || "";
+    const adminEmail = String(process.env.ADMIN_EMAIL || "zahidovorxan989@gmail.com").trim().toLowerCase();
     if (!pass || !process.env.ADMIN_SECRET) {
       return res.status(500).json({ ok: false, error: "ADMIN_PASSWORD və ya ADMIN_SECRET Vercel-də təyin olunmayıb." });
     }
+    const ip = String((req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")).split(",")[0].trim() || "?";
+    const rec = loginTries.get(ip) || { n: 0, until: 0 };
+    if (Date.now() < rec.until) {
+      return res.status(429).json({ ok: false, error: "Çox sayda uğursuz cəhd. Bir az sonra yenidən yoxlayın." });
+    }
     const b = body(req);
-    if (!safeEq(b.password || "", pass)) return res.status(401).json({ ok: false, error: "Şifrə yanlışdır." });
+    // Hər iki sahə həmişə yoxlanır (hansının səhv olduğu bilinməsin)
+    const okEmail = safeEq(String(b.email || "").trim().toLowerCase(), adminEmail);
+    const okPass = safeEq(b.password || "", pass);
+    if (!(okEmail && okPass)) {
+      rec.n += 1;
+      if (rec.n >= 5) { rec.until = Date.now() + 15 * 60 * 1000; rec.n = 0; }
+      loginTries.set(ip, rec);
+      await new Promise(function (r) { setTimeout(r, 700); });
+      return res.status(401).json({ ok: false, error: "E-poçt və ya şifrə yanlışdır." });
+    }
+    loginTries.delete(ip);
     const token = sign({ role: "admin", exp: Date.now() + 12 * 60 * 60 * 1000 });
     return res.status(200).json({ ok: true, token: token });
   }
@@ -125,11 +143,32 @@ module.exports = async function handler(req, res) {
     const r = await pool.query(
       `update site_products
        set name = $2, name_az = $2, name_ru = $3, name_en = $4, category_key = $5,
-           image_url = $6, active = $7, sort_order = $8
+           image_url = $6, active = $7, sort_order = coalesce($8, sort_order)
        where product_key = $1 returning product_key`,
       [key, nameAz, txt(b.name_ru), txt(b.name_en), txt(b.category_key), txt(b.image_url),
-       !!b.active, parseInt(b.sort_order, 10) || 0]);
+       !!b.active, Number.isFinite(parseInt(b.sort_order, 10)) ? parseInt(b.sort_order, 10) : null]);
     if (!r.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_reorder") {
+    const b = body(req);
+    const order = Array.isArray(b.order) ? b.order.map(String).slice(0, 500) : [];
+    if (!order.length) return res.status(400).json({ ok: false, error: "Sıra boşdur." });
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      for (let i = 0; i < order.length; i++) {
+        await client.query("update site_products set sort_order = $2 where product_key = $1", [order[i], (i + 1) * 10]);
+      }
+      await client.query("commit");
+    } catch (e) {
+      await client.query("rollback").catch(function () {});
+      console.error("product_reorder:", e);
+      return res.status(500).json({ ok: false, error: "Sıra yadda saxlanmadı." });
+    } finally {
+      client.release();
+    }
     return res.status(200).json({ ok: true });
   }
 
