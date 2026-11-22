@@ -40,7 +40,7 @@ const TX = {
     prices: "Qiymətlər (başlanğıc):", from: "başlanğıc", month: "ay", old: "əvvəl",
     details: "Ətraflı və sifariş", priceHead: "Qiymətlər:", features: "Xüsusiyyətlər:",
     several: "Bu axtarışa uyğun məhsullar:", suggest: "Sizə bunları təklif edirəm:",
-    catalog: "Bütün məhsullar", more: "Digər məhsullar üçün",
+    catalog: "Bütün məhsullar", more: "Digər məhsullar üçün", waBtn: "WhatsApp-da yaz",
     order: "Sifariş etmək üçün:\n1) Məhsulu seçin və müddəti təyin edin\n2) Ad və WhatsApp nömrənizi yazın\n3) «WhatsApp-la sifariş et» düyməsinə basın\nSifarişiniz təsdiqləndikdən sonra hazırlanır.",
     pay: "Ödəniş üsulları barədə dəqiq məlumatı sifariş zamanı operator WhatsApp-da təqdim edir.",
     delivery: "Sifarişiniz təsdiqləndikdən sonra hazırlanır. Dəqiq müddəti operator sifariş zamanı bildirəcək.",
@@ -56,7 +56,7 @@ const TX = {
     prices: "Цены (от):", from: "от", month: "мес.", old: "было",
     details: "Подробнее и заказ", priceHead: "Цены:", features: "Особенности:",
     several: "Подходящие товары:", suggest: "Рекомендую:",
-    catalog: "Все товары", more: "Другие товары",
+    catalog: "Все товары", more: "Другие товары", waBtn: "Написать в WhatsApp",
     order: "Как заказать:\n1) Выберите товар и срок\n2) Укажите имя и номер WhatsApp\n3) Нажмите «Заказать в WhatsApp»\nЗаказ готовится после подтверждения.",
     pay: "Подробности об оплате оператор сообщит в WhatsApp при оформлении заказа.",
     delivery: "Заказ готовится после подтверждения. Точный срок сообщит оператор при оформлении.",
@@ -72,7 +72,7 @@ const TX = {
     prices: "Prices (from):", from: "from", month: "mo", old: "was",
     details: "Details and order", priceHead: "Prices:", features: "Features:",
     several: "Matching products:", suggest: "I suggest:",
-    catalog: "All products", more: "More products",
+    catalog: "All products", more: "More products", waBtn: "Chat on WhatsApp",
     order: "How to order:\n1) Choose a product and duration\n2) Enter your name and WhatsApp number\n3) Press “Order via WhatsApp”\nYour order is prepared after confirmation.",
     pay: "The operator will share payment details on WhatsApp when you place the order.",
     delivery: "Your order is prepared after confirmation. The operator will tell you the exact time when you order.",
@@ -85,10 +85,17 @@ const TX = {
 function pname(p, lang) { return p.name[lang] || p.name.az || p.name.en || ""; }
 function money(n) { return Number(n).toFixed(2) + " AZN"; }
 function link(p) { return "product.html?slug=" + encodeURIComponent(p.slug); }
+// Çat pəncərəsi xam link göstərmir: [yazı](keçid) düymə, {{p|slug|ad|qiymət}} məhsul kartı kimi çəkilir
+function clean(s) { return String(s == null ? "" : s).replace(/[|{}\[\]\n\r]/g, " ").replace(/\s+/g, " ").trim(); }
+function mdLink(label, url) { return "[" + clean(label) + "](" + url + ")"; }
+function card(p, lang, t) {
+  const m = minPrice(p);
+  return "{{p|" + encodeURIComponent(p.slug) + "|" + clean(pname(p, lang)) + "|" + t.from + " " + money(m.price) + "}}";
+}
 function minPrice(p) { return p.prices.reduce(function (a, b) { return b.price < a.price ? b : a; }, p.prices[0]); }
 
 function productDetail(p, lang, t) {
-  const lines = [pname(p, lang)];
+  const lines = ["**" + clean(pname(p, lang)) + "**"];
   const d = String(p.description[lang] || p.description.az || "").trim();
   if (d) lines.push(d.length > 260 ? d.slice(0, 257) + "..." : d);
   const feats = (p.features[lang] && p.features[lang].length ? p.features[lang] : p.features.az) || [];
@@ -96,15 +103,12 @@ function productDetail(p, lang, t) {
   lines.push(t.priceHead + "\n" + p.prices.map(function (x) {
     return "• " + x.months + " " + t.month + " — " + money(x.price) + (x.old ? " (" + t.old + " " + money(x.old) + ")" : "");
   }).join("\n"));
-  lines.push(t.details + ": " + link(p));
+  lines.push(mdLink(t.details, link(p)));
   return lines.join("\n\n");
 }
 
 function productList(list, lang, t, head) {
-  return head + "\n" + list.map(function (p) {
-    const m = minPrice(p);
-    return "• " + pname(p, lang) + " — " + t.from + " " + money(m.price) + "\n  " + link(p);
-  }).join("\n");
+  return head + "\n" + list.map(function (p) { return card(p, lang, t); }).join("\n");
 }
 
 async function loadData(pool) {
@@ -218,7 +222,7 @@ async function reply(pool, text, langIn) {
   const products = data.products;
   const words = n.split(" ").filter(Boolean);
   const wa = String(data.settings.whatsapp || "").replace(/\D/g, "");
-  const waLine = wa ? "WhatsApp: https://wa.me/" + wa : "";
+  const waLine = wa ? mdLink(t.waBtn, "https://wa.me/" + wa) : "";
 
   // 1) Təşəkkür / salam (qısa mesajlar)
   if (words.length <= 5 && has(n, KW.thanks)) return t.thanks;
@@ -255,17 +259,17 @@ async function reply(pool, text, langIn) {
     return lines.join("\n");
   }
   if (has(n, KW.price) && products.length) {
-    return productList(products.slice(0, 12), lang, t, t.prices) + "\n\n" + t.catalog + ": products.html";
+    return productList(products.slice(0, 12), lang, t, t.prices) + "\n\n" + mdLink(t.catalog, "products.html");
   }
   if (has(n, KW.list) && products.length) {
     const top = searchByText(n, products, data.cats);
     const show = top.length ? top : products.slice(0, 5);
-    return productList(show, lang, t, t.suggest) + "\n\n" + t.catalog + ": products.html";
+    return productList(show, lang, t, t.suggest) + "\n\n" + mdLink(t.catalog, "products.html");
   }
 
   // 6) Mətn üzrə axtarış (kateqoriya / təsvir)
   const found2 = searchByText(n, products, data.cats);
-  if (found2.length) return productList(found2, lang, t, t.suggest) + "\n\n" + t.catalog + ": products.html";
+  if (found2.length) return productList(found2, lang, t, t.suggest) + "\n\n" + mdLink(t.catalog, "products.html");
 
   if (greeting) return t.greet;
   return t.fallback + (products.length ? "\n\n" + productList(products.slice(0, 4), lang, t, t.suggest) : "");
