@@ -11,12 +11,12 @@
     ru: { month: "мес.", del: "Удалить", browse: "Смотреть товары", nameLbl: "Ваше имя", namePh: "Имя и фамилия",
       phoneLbl: "Ваш номер WhatsApp", phonePh: "+994 50 000 00 00", wa: "Заказать в WhatsApp",
       errName: "Введите имя.", errPhone: "Введите правильный номер WhatsApp.", noWa: "Номер WhatsApp ещё не задан.",
-      intro: "Здравствуйте, хочу оформить заказ.", total: "Итого", name: "Имя", phone: "Номер", or: "или", account: "Заказ через аккаунт (нужен вход)",
+      intro: "Здравствуйте, хочу оформить заказ.", total: "Итого", name: "Имя", phone: "Номер", or: "или", account: "Заказать через сайт",
       fail: "Не удалось оформить заказ." },
     en: { month: "mo", del: "Remove", browse: "Browse products", nameLbl: "Your name", namePh: "Full name",
       phoneLbl: "Your WhatsApp number", phonePh: "+994 50 000 00 00", wa: "Order via WhatsApp",
       errName: "Please enter your name.", errPhone: "Please enter a valid WhatsApp number.", noWa: "WhatsApp number is not set yet.",
-      intro: "Hello, I would like to place an order.", total: "Total", name: "Name", phone: "Number", or: "or", account: "Order with account (sign-in required)",
+      intro: "Hello, I would like to place an order.", total: "Total", name: "Name", phone: "Number", or: "or", account: "Order through website",
       fail: "Order could not be created." }
   };
   var t = TX[lang] || TX.az;
