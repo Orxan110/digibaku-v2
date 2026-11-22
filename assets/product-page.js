@@ -40,7 +40,7 @@
 
   var css = ".pd-grid{display:grid;gap:18px;margin:18px 0}" +
     "@media(min-width:900px){.pd-grid{grid-template-columns:1fr 1fr;align-items:start}}" +
-    ".pd-img{aspect-ratio:1/1;max-width:260px;border-radius:22px;background:var(--card2);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:12px}" +
+    ".pd-img{aspect-ratio:1/1;width:100%;max-width:460px;border-radius:22px;background:var(--card2);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:0}" +
     ".pd-img img{width:100%;height:100%;object-fit:cover}" +
     ".pd-title{font-size:clamp(22px,4vw,28px);line-height:1.25;margin:4px 0 8px}" +
     ".pd-label{font-size:14px;color:var(--muted);margin:16px 0 10px}" +
