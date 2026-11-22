@@ -28,7 +28,11 @@
     ".pprice{color:var(--gold);font-size:18px;font-weight:700;margin:0 4px}" +
     ".pprice small{color:var(--muted);font-size:12px;font-weight:400;margin-right:4px}" +
     ".pold{color:var(--muted);font-size:13px;text-decoration:line-through;margin-right:6px}" +
-    ".pbtn{margin:12px 4px 4px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}";
+    ".pbtn{margin:12px 4px 4px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}" +
+    ".sk{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px}" +
+    ".sk i{display:block;border-radius:12px;background:linear-gradient(90deg,#1a1a1a 25%,#262626 50%,#1a1a1a 75%);background-size:200% 100%;animation:skm 1.2s infinite}" +
+    ".sk i.a{aspect-ratio:1/1}.sk i.b{height:14px;margin-top:12px;width:80%}.sk i.c{height:14px;margin-top:8px;width:50%}" +
+    "@keyframes skm{from{background-position:200% 0}to{background-position:-200% 0}}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
@@ -41,15 +45,12 @@
   function nameOf(p) { return (p.name && (p.name[lang] || p.name.az)) || ""; }
   function catLabel(c) { return c["name_" + lang] || c.name_az || ""; }
 
-  async function init() {
+  function render(data) {
     try {
       var params = new URLSearchParams(location.search);
       var cat = params.get("cat") || "";
       var q = (params.get("q") || "").toLowerCase();
 
-      var res = await fetch("/api/products");
-      if (!res.ok) { grid.innerHTML = '<div class="empty">' + esc(t.err) + "</div>"; return; }
-      var data = await res.json();
       var cats = (data.categories || []).filter(function (c) { return c.key; });
       var items = data.products || [];
 
@@ -98,5 +99,12 @@
     }
   }
 
-  init();
+  grid.innerHTML = new Array(8).join("|").split("|").map(function () {
+    return '<div class="sk"><i class="a"></i><i class="b"></i><i class="c"></i></div>';
+  }).join("");
+  grid.className = "pgrid";
+  DBApi.swr("/api/products", function (d) {
+    if (!d) { grid.className = "grid"; grid.innerHTML = '<div class="empty">' + esc(t.err) + "</div>"; return; }
+    render(d);
+  });
 })();
