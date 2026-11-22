@@ -6,7 +6,7 @@
     az: { month: "ay", del: "Sil", browse: "Məhsullara bax", nameLbl: "Adınız", namePh: "Ad və soyad",
       phoneLbl: "WhatsApp nömrəniz", phonePh: "+994 50 000 00 00", wa: "WhatsApp-la sifariş et",
       errName: "Ad daxil edin.", errPhone: "Düzgün WhatsApp nömrəsi daxil edin.", noWa: "WhatsApp nömrəsi hələ təyin olunmayıb.",
-      intro: "Salam, sifariş vermək istəyirəm.", total: "Ümumi", name: "Ad", phone: "Nömrə", or: "və ya", account: "Hesabla sifariş (giriş tələb olunur)",
+      intro: "Salam, sifariş vermək istəyirəm.", total: "Ümumi", name: "Ad", phone: "Nömrə", or: "və ya", account: "Sayt üzərindən sifariş et",
       fail: "Sifariş yaradılmadı." },
     ru: { month: "мес.", del: "Удалить", browse: "Смотреть товары", nameLbl: "Ваше имя", namePh: "Имя и фамилия",
       phoneLbl: "Ваш номер WhatsApp", phonePh: "+994 50 000 00 00", wa: "Заказать в WhatsApp",
