@@ -78,3 +78,65 @@ footer a{display:block;padding:4px 0}
 .fab{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--text);box-shadow:0 4px 14px rgba(0,0,0,.5)}
 .fab.wa{background:var(--gold);color:#000;border-color:var(--gold)}
 @media(min-width:900px){.bottom-nav{display:none}body{padding-bottom:0}.fabs{bottom:24px}}
+
+/* ===== Çat ===== */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.chat-wrap{padding-top:14px;padding-bottom:8px}
+.chatbox{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;height:calc(100vh - 250px);height:calc(100dvh - 250px);min-height:440px;max-height:780px}
+@media(min-width:900px){.chatbox{height:calc(100vh - 200px);height:calc(100dvh - 200px)}}
+.chat-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--card2)}
+.chat-av{width:38px;height:38px;border-radius:50%;background:var(--gold);color:#000;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.chat-ht{display:flex;flex-direction:column;min-width:0;margin-right:auto;line-height:1.3}
+.chat-ht b{font-size:15px}
+.chat-ht span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-ht span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;margin-right:6px;vertical-align:middle}
+.chat-wa{flex:0 0 auto;background:#25d366;color:#04200e;font-weight:700;font-size:13px;border-radius:999px;padding:8px 14px;white-space:nowrap}
+.chat-wa[hidden]{display:none}
+.chat-new{flex:0 0 36px;width:36px;height:36px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:18px;cursor:pointer;line-height:1}
+.chat-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.cm-row{display:flex;flex-direction:column;max-width:88%}
+.cm-row.me{align-self:flex-end;align-items:flex-end}
+.cm-row.them{align-self:flex-start;align-items:flex-start}
+.cm-b{padding:10px 14px;border-radius:18px;word-break:break-word;line-height:1.45;font-size:15px;max-width:100%}
+.cm-row.me .cm-b{background:var(--gold);color:#000;border-bottom-right-radius:6px;white-space:pre-wrap}
+.cm-row.them .cm-b{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:6px}
+.cm-row.pending .cm-b{opacity:.65}
+.cm-meta{font-size:11px;color:var(--muted);margin:3px 6px 10px}
+.cm-text{white-space:pre-wrap}
+.cm-text a{color:var(--gold);text-decoration:underline}
+.cm-cards{display:flex;flex-direction:column;gap:8px;margin:8px 0 2px}
+.cm-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);transition:border-color .2s}
+.cm-card:hover{border-color:var(--gold)}
+.cm-card-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.cm-card-t b{font-size:14px;line-height:1.3;font-weight:600}
+.cm-card-t em{font-style:normal;color:var(--gold);font-size:13px;font-weight:700}
+.cm-card-go{color:var(--gold);font-size:22px;line-height:1}
+.cm-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.cm-btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:14px;font-weight:600;text-decoration:none!important}
+.cm-btn.wa{background:#25d366;border-color:#25d366;color:#04200e}
+.cm-text .cm-btn{margin:2px 0}
+.cm-day{align-self:center;font-size:12px;color:var(--muted);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;margin:10px 0 8px}
+.cm-typing{display:inline-flex;gap:5px;padding:4px 2px}
+.cm-typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:cmb 1.2s infinite}
+.cm-typing i:nth-child(2){animation-delay:.15s}
+.cm-typing i:nth-child(3){animation-delay:.3s}
+@keyframes cmb{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-4px);opacity:1}}
+.chat-quick{display:flex;gap:8px;overflow-x:auto;padding:8px 14px;border-top:1px solid var(--line);scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chat-quick::-webkit-scrollbar{display:none}
+.chat-quick button{flex:0 0 auto;border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.chat-quick button:hover{border-color:var(--gold);color:var(--gold)}
+.chat-foot{padding:10px 12px;border-top:1px solid var(--line);background:var(--card2)}
+.chat-name{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;font-size:16px;outline:none}
+.chat-name:focus,.chat-row textarea:focus{border-color:var(--gold)}
+.chat-row{display:flex;gap:8px;align-items:flex-end}
+.chat-row textarea{flex:1;min-height:44px;max-height:120px;padding:11px 14px;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;font-size:16px;line-height:1.4;resize:none;outline:none}
+.chat-send{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:0;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.chat-send:disabled{opacity:.5;cursor:not-allowed}
+.chat-send svg{width:20px;height:20px}
+.chat-err{min-height:0;margin:6px 4px 0;font-size:13px}
+.chat-err:empty{display:none}
+/* Admin çatında bot mesajları (qızılı fon üzərində oxunaqlı) */
+.cm-admin .cm-text a,.cm-admin .cm-btn{color:#000;border-color:#000}
+.cm-admin .cm-btn.wa{color:#04200e;border-color:#25d366}
+.cm-admin .cm-card{background:rgba(0,0,0,.08);border-color:rgba(0,0,0,.35)}
+.cm-admin .cm-card-t em,.cm-admin .cm-card-go{color:#000}
