@@ -1,5 +1,33 @@
-/* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO. */
+/* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO, şəkil xətası qoruması. */
 (function(){
+  // Şəkil xətası: 1) keşi keçərək yenidən yoxla, 2) digər uzantıları yoxla, 3) marka yazılı nişan göstər.
+  // Beləliklə bir şəkil açılmasa belə səhifə pozulmur və yeni məhsul əlavə edəndə problem yaranmır.
+  (function(){
+    var EXT = ["webp", "png", "jpg", "jpeg", "avif"];
+    document.addEventListener("error", function(e){
+      var im = e.target;
+      if(!im || im.tagName !== "IMG" || !im.hasAttribute("data-img")) return;
+      var base = im.getAttribute("data-src0");
+      if(!base){ base = (im.getAttribute("src") || "").split("?")[0]; im.setAttribute("data-src0", base); }
+      var step = parseInt(im.getAttribute("data-fb") || "0", 10);
+      var cands = [base + "?cb=" + Date.now()];
+      var m = base.match(/^(.*)\.([A-Za-z0-9]+)$/);
+      if(m){ EXT.forEach(function(x){ if(x !== m[2].toLowerCase()) cands.push(m[1] + "." + x); }); }
+      e.stopImmediatePropagation();
+      if(step < cands.length){
+        im.setAttribute("data-fb", String(step + 1));
+        im.setAttribute("src", cands[step]);
+        return;
+      }
+      var name = String(im.getAttribute("alt") || "").trim().split(/\s+/)[0] || "";
+      var ph = document.createElement("span");
+      ph.className = "imgfb";
+      ph.textContent = name;
+      ph.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:8px;box-sizing:border-box;text-align:center;font-weight:800;font-size:clamp(16px,4vw,24px);color:#d4af37;letter-spacing:.5px";
+      im.replaceWith(ph);
+    }, true);
+  })();
+
   var T = {
     az:{home:"Ana səhifə",products:"Məhsullar",cart:"Səbət",orders:"Sifarişlər",profile:"Profilim",
         login:"Daxil ol",register:"Qeydiyyat",search:"Məhsul axtar...",faq:"FAQ",contact:"Əlaqə",
