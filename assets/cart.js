@@ -86,7 +86,7 @@
       '<div class="err" id="waErr"></div>' +
       '<button class="btn gold" id="waBtn" style="width:100%;padding:14px">' + t.wa + "</button>" +
       '<p class="muted" style="text-align:center;margin:12px 0;font-size:13px">' + t.or + "</p>" +
-      '<button class="btn" id="checkoutBtn" style="width:100%">' + t.account + "</button>";
+      '<button class="btn gold" id="checkoutBtn" style="width:100%;padding:14px">' + t.account + "</button>";
 
     box.querySelectorAll("[data-a]").forEach(function (b) {
       b.onclick = function () {
