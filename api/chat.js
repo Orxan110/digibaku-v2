@@ -27,22 +27,23 @@ async function ensureBot() {
   return globalThis.chatBotReady;
 }
 
-// Admin son 10 dəqiqədə cavab veribsə bot susur
-async function adminActive() {
+// Operator bu söhbətdə son 10 dəqiqədə cavab veribsə bot həmin söhbətdə susur (digər söhbətlərə təsir etmir)
+async function adminActive(threadId) {
   const r = await pool.query(
-    "select 1 from chat_messages where sender = 'admin' and is_bot = false and created_at > now() - interval '10 minutes' limit 1");
+    `select 1 from chat_messages where thread_id = $1 and sender = 'admin' and is_bot = false
+     and created_at > now() - interval '10 minutes' limit 1`, [threadId]);
   return r.rowCount > 0;
 }
 
 async function runBot(threadId, text, lang) {
-  if (await adminActive()) return null;
+  if (await adminActive(threadId)) return null;
   let answer = await botReply(pool, text, lang);
   const prev = await pool.query("select 1 from chat_messages where thread_id = $1 and is_bot = true limit 1", [threadId]);
   const t = BOT_TX[lang] || BOT_TX.az;
   if (!prev.rowCount) answer += "\n\n" + t.offline;
   const m = await pool.query(
     `insert into chat_messages (thread_id, sender, body, is_bot) values ($1, 'admin', $2, true)
-     returning id::int as id, sender, body, created_at`,
+     returning id::int as id, sender, body, created_at, is_bot`,
     [threadId, answer.slice(0, 1900)]);
   await pool.query("update chat_threads set last_message_at = now() where id = $1", [threadId]);
   return m.rows[0];
@@ -111,8 +112,10 @@ module.exports = async function handler(req, res) {
       if (!token) return res.status(200).json({ ok: true, messages: [], notfound: true });
       const t = await pool.query("select id, status from chat_threads where visitor_token = $1", [token]);
       if (!t.rowCount) return res.status(200).json({ ok: true, messages: [], notfound: true });
+      const hasBot = await ensureBot();
       const r = await pool.query(
-        `select id::int as id, sender, body, created_at from chat_messages
+        `select id::int as id, sender, body, created_at, ${hasBot ? "coalesce(is_bot, false)" : "false"} as is_bot
+         from chat_messages
          where thread_id = $1 and id > $2 order by id limit 200`,
         [t.rows[0].id, after]);
       return res.status(200).json({ ok: true, messages: r.rows, status: t.rows[0].status });
