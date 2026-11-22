@@ -59,7 +59,7 @@
       '<div style="max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-break:break-word;' +
       (mine ? "background:#d4af37;color:#000" : "background:#1a1a1a;color:#f5f5f5;border:1px solid #262626") + '">' +
       esc(m.body) + "</div>" +
-      '<span class="muted" style="font-size:11px;margin-top:3px">' + esc(mine ? "Siz" : "Müştəri") + " · " + esc(fmt(m.created_at)) + "</span></div>";
+      '<span class="muted" style="font-size:11px;margin-top:3px">' + esc(mine ? (m.is_bot ? "Bot (avto)" : "Siz") : "Müştəri") + " · " + esc(fmt(m.created_at)) + "</span></div>";
   }
 
   function appendMessages(msgs) {
