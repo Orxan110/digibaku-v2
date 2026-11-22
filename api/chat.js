@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { pool } = require("./_db");
 const { verify } = require("./_auth");
+const { reply: botReply, TX: BOT_TX } = require("./_bot");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -11,6 +12,40 @@ function body(req) {
 }
 function txt(v, max) {
   return String(v == null ? "" : v).trim().slice(0, max);
+}
+
+// Bot üçün is_bot sütunu (bir dəfə yaradılır)
+async function ensureBot() {
+  if (globalThis.chatBotReady !== undefined) return globalThis.chatBotReady;
+  try {
+    await pool.query("alter table chat_messages add column if not exists is_bot boolean not null default false");
+    globalThis.chatBotReady = true;
+  } catch (e) {
+    console.error("chat is_bot:", e);
+    globalThis.chatBotReady = false;
+  }
+  return globalThis.chatBotReady;
+}
+
+// Admin son 10 dəqiqədə cavab veribsə bot susur
+async function adminActive() {
+  const r = await pool.query(
+    "select 1 from chat_messages where sender = 'admin' and is_bot = false and created_at > now() - interval '10 minutes' limit 1");
+  return r.rowCount > 0;
+}
+
+async function runBot(threadId, text, lang) {
+  if (await adminActive()) return null;
+  let answer = await botReply(pool, text, lang);
+  const prev = await pool.query("select 1 from chat_messages where thread_id = $1 and is_bot = true limit 1", [threadId]);
+  const t = BOT_TX[lang] || BOT_TX.az;
+  if (!prev.rowCount) answer += "\n\n" + t.offline;
+  const m = await pool.query(
+    `insert into chat_messages (thread_id, sender, body, is_bot) values ($1, 'admin', $2, true)
+     returning id::int as id, sender, body, created_at`,
+    [threadId, answer.slice(0, 1900)]);
+  await pool.query("update chat_threads set last_message_at = now() where id = $1", [threadId]);
+  return m.rows[0];
 }
 
 module.exports = async function handler(req, res) {
@@ -61,7 +96,13 @@ module.exports = async function handler(req, res) {
       await pool.query(
         "update chat_threads set unread_admin = unread_admin + 1, last_message_at = now(), status = 'open' where id = $1",
         [thread.id]);
-      return res.status(200).json({ ok: true, token: token, message: m.rows[0] });
+      let bot = null;
+      try {
+        if (await ensureBot()) bot = await runBot(thread.id, text, txt(b.lang, 5));
+      } catch (e) {
+        console.error("bot:", e);
+      }
+      return res.status(200).json({ ok: true, token: token, message: m.rows[0], bot: bot });
     }
 
     if (req.method === "GET" && action === "poll") {
@@ -92,13 +133,14 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "GET" && action === "admin_messages") {
+      await ensureBot();
       const id = String(q.thread || "");
       if (!UUID_RE.test(id)) return res.status(400).json({ ok: false, error: "Söhbət yanlışdır." });
       const after = parseInt(q.after, 10) || 0;
       const t = await pool.query("select id, visitor_name, status from chat_threads where id = $1", [id]);
       if (!t.rowCount) return res.status(404).json({ ok: false, error: "Söhbət tapılmadı." });
       const r = await pool.query(
-        `select id::int as id, sender, body, created_at from chat_messages
+        `select id::int as id, sender, body, created_at, coalesce(is_bot, false) as is_bot from chat_messages
          where thread_id = $1 and id > $2 order by id limit 500`,
         [id, after]);
       await pool.query("update chat_threads set unread_admin = 0 where id = $1", [id]);
