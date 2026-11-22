@@ -80,7 +80,19 @@ module.exports = async function handler(req, res) {
        order by o.created_at desc limit 200`);
     return res.status(200).json({ ok: true, orders: r.rows });
   }
-
+  if (req.method === "GET" && action === "customers") {
+    const r = await pool.query(
+      `select u.id, u.name, u.email,
+              count(o.id)::int as order_count,
+              coalesce(sum(o.total) filter (where o.status <> 'cancelled'), 0) as total_spent,
+              max(o.created_at) as last_order
+       from neon_auth."user" u
+       left join orders o on o.user_id = u.id
+       group by u.id, u.name, u.email
+       order by max(o.created_at) desc nulls last, u.email
+       limit 500`);
+    return res.status(200).json({ ok: true, customers: r.rows });
+  }
   if (req.method === "POST" && action === "order_status") {
     const b = body(req);
     if (!STATUSES.includes(b.status)) return res.status(400).json({ ok: false, error: "Status yanlışdır." });
