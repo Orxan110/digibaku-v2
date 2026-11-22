@@ -55,17 +55,17 @@
     ".chip.on{background:var(--gold);border-color:var(--gold);color:#000;font-weight:700}" +
     ".pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}" +
     "@media(min-width:900px){.pgrid{grid-template-columns:repeat(4,1fr)}}" +
-    ".pcard{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;color:var(--text);transition:border-color .2s;position:relative}" +
+    ".pcard{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px;color:var(--text);transition:border-color .2s;position:relative}" +
     ".pcard:hover{border-color:var(--gold)}" +
-    ".pbadge{position:absolute;top:10px;right:10px;background:var(--gold);color:#000;font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px}" +
-    ".pimg{width:84px;height:84px;border-radius:18px;background:var(--card2);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);text-align:center;padding:6px}" +
+    ".pbadge{position:absolute;top:18px;right:18px;z-index:2;background:var(--gold);color:#000;font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px}" +
+    ".pimg{width:100%;aspect-ratio:1/1;border-radius:14px;background:var(--card2);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);text-align:center;padding:0}" +
     ".pimg img{width:100%;height:100%;object-fit:cover}" +
-    ".pname{font-size:15px;font-weight:600;margin:12px 0 6px;line-height:1.35}" +
-    ".pmeta{font-size:12px;color:var(--muted);margin-bottom:10px}" +
-    ".pprice{color:var(--gold);font-size:18px;font-weight:700}" +
+    ".pname{font-size:15px;font-weight:600;margin:12px 4px 6px;line-height:1.35}" +
+    ".pmeta{font-size:12px;color:var(--muted);margin:0 4px 10px}" +
+    ".pprice{color:var(--gold);font-size:18px;font-weight:700;margin:0 4px}" +
     ".pprice small{color:var(--muted);font-size:12px;font-weight:400;margin-right:4px}" +
     ".pold{color:var(--muted);font-size:13px;text-decoration:line-through;margin-right:6px}" +
-    ".pbtn{margin-top:12px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}";
+    ".pbtn{margin:12px 4px 4px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
