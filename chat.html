@@ -10,16 +10,30 @@
 <body data-page="chat">
 <div id="site-header"></div>
 
-<main class="wrap" style="padding-bottom:110px">
-  <h1 style="margin:20px 0 12px;font-size:24px">Çat</h1>
-  <div class="card-box">
-    <div id="chatMsgs" style="height:46vh;min-height:260px;overflow-y:auto;padding-right:4px"></div>
-    <input id="chatName" maxlength="60" style="width:100%;padding:12px;margin-top:12px;border-radius:12px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5;box-sizing:border-box;font-size:16px">
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <textarea id="chatText" rows="2" maxlength="1000" style="flex:1;padding:12px;border-radius:12px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5;box-sizing:border-box;font-size:16px;resize:none"></textarea>
-      <button id="chatSend" class="btn gold" type="button">Göndər</button>
+<main class="wrap chat-wrap">
+  <h1 class="sr-only">Çat</h1>
+  <div class="chatbox" id="chat">
+    <div class="chat-head">
+      <div class="chat-av" aria-hidden="true">D</div>
+      <div class="chat-ht"><b id="chatTitle">DigiBaku</b><span id="chatSub"></span></div>
+      <a class="chat-wa" id="chatWa" href="#" target="_blank" rel="noopener" hidden>WhatsApp</a>
+      <button type="button" class="chat-new" id="chatNew" aria-label="Yeni söhbət" title="Yeni söhbət">↺</button>
     </div>
-    <div id="chatErr" class="err" style="min-height:18px;margin-top:6px"></div>
+
+    <div class="chat-msgs" id="chatMsgs" role="log" aria-live="polite"></div>
+
+    <div class="chat-quick" id="chatQuick"></div>
+
+    <div class="chat-foot">
+      <input id="chatName" class="chat-name" maxlength="60" autocomplete="name">
+      <div class="chat-row">
+        <textarea id="chatText" rows="1" maxlength="1000"></textarea>
+        <button id="chatSend" class="chat-send" type="button" aria-label="Göndər">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2z"/></svg>
+        </button>
+      </div>
+      <div id="chatErr" class="err chat-err" role="alert"></div>
+    </div>
   </div>
 </main>
 
@@ -29,12 +43,12 @@
   <p style="margin-top:10px">© DigiBaku</p>
 </footer>
 
-<div id="fabs"></div>
 <nav id="bottom-nav"></nav>
 
 <script src="assets/auth.js"></script>
 <script src="assets/api.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/chat-render.js"></script>
 <script src="assets/chat.js"></script>
 </body>
 </html>
