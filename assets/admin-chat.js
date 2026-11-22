@@ -13,6 +13,8 @@
   function fmt(d) {
     try { return new Date(d).toLocaleString("az-AZ"); } catch (e) { return ""; }
   }
+  // Bot/operator mesajlarındakı kart və düymələr xam mətn kimi görünməsin
+  function plain(s) { return window.ChatRender ? ChatRender.plain(s) : String(s || ""); }
 
   // ---------- Söhbətlərin siyahısı ----------
   function renderList(threads) {
@@ -27,7 +29,7 @@
       return '<div class="card-box" data-open="' + esc(t.id) + '" style="margin-bottom:10px;cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' +
         esc(t.visitor_name || "Qonaq") + "</b>" + unread + "</div>" +
-        '<p style="margin:6px 0;color:#d4d4d4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.last_body || "") + "</p>" +
+        '<p style="margin:6px 0;color:#d4d4d4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(plain(t.last_body)) + "</p>" +
         '<span class="muted" style="font-size:12px">' + esc(fmt(t.last_message_at)) + "</span></div>";
     }).join("");
     list.innerHTML = tabs + (body || '<div class="empty">Söhbət yoxdur.</div>');
@@ -55,10 +57,12 @@
   // ---------- Bir söhbət ----------
   function bubble(m) {
     var mine = m.sender === "admin";
+    // Bot mesajı kart/düymə ilə, operatorun və müştərinin mesajı sadə mətn kimi göstərilir
+    var rich = mine && m.is_bot && window.ChatRender;
     return '<div style="display:flex;flex-direction:column;align-items:' + (mine ? "flex-end" : "flex-start") + ';margin-bottom:10px">' +
-      '<div style="max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-break:break-word;' +
+      '<div style="max-width:85%;padding:10px 14px;border-radius:16px;word-break:break-word;' + (rich ? "" : "white-space:pre-wrap;") +
       (mine ? "background:#d4af37;color:#000" : "background:#1a1a1a;color:#f5f5f5;border:1px solid #262626") + '">' +
-      esc(m.body) + "</div>" +
+      (rich ? '<div class="cm-admin">' + ChatRender.html(m.body) + "</div>" : esc(m.body)) + "</div>" +
       '<span class="muted" style="font-size:11px;margin-top:3px">' + esc(mine ? (m.is_bot ? "Bot (avto)" : "Siz") : "Müştəri") + " · " + esc(fmt(m.created_at)) + "</span></div>";
   }
 
