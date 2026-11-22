@@ -25,6 +25,25 @@ window.DBApi = {
       return { ok: false, status: 0, data: { error: String(e && e.message || e) } };
     }
   },
+  // Keşdən dərhal göstər, arxa planda yenilə (sayt tez açılsın deyə)
+  // cb(data, fromCache). Server cavab verməsə və keş yoxdursa cb(null, false).
+  swr(url, cb) {
+    var self = this, key = "digibaku_c1:" + url, cachedTxt = null;
+    try { cachedTxt = localStorage.getItem(key); } catch (e) {}
+    if (cachedTxt) {
+      try { cb(JSON.parse(cachedTxt), true); } catch (e) { cachedTxt = null; }
+    }
+    return self.get(url).then(function (r) {
+      if (r.ok && r.data && r.data.ok !== false) {
+        var txt = JSON.stringify(r.data);
+        if (txt !== cachedTxt) cb(r.data, false);
+        try { localStorage.setItem(key, txt); } catch (e) {}
+      } else if (!cachedTxt) {
+        cb(null, false);
+      }
+      return r;
+    });
+  },
   async post(url, body) {
     try {
       var h = await this.authHeaders(url);
