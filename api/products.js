@@ -5,7 +5,7 @@ const { pool } = require("./_db");
 const MONTHS = [1, 2, 3, 6, 12];
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=60");
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const cats = await pool.query(
