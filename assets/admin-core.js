@@ -11,6 +11,8 @@
   var msg = document.getElementById("msg");
   var login = document.getElementById("login");
   var pw = document.getElementById("pw");
+  var em = document.getElementById("em");
+  var PRODUCTS = [];
   var side = document.getElementById("side");
   var nav = document.getElementById("nav");
   var secTitle = document.getElementById("secTitle");
@@ -56,6 +58,7 @@
   }
 
   function showLogin() {
+    document.body.classList.add("locked");
     login.style.display = "";
     logoutBtn.style.display = "none";
     list.innerHTML = "";
@@ -128,9 +131,50 @@
         (on ? " checked" : "") + "> endirim</label></div>";
   }
 
+  function renderSortMode() {
+    var items = PRODUCTS.slice();
+    function move(i, to) {
+      if (to < 0 || to >= items.length || i === to) return;
+      var x = items.splice(i, 1)[0];
+      items.splice(to, 0, x);
+      draw();
+    }
+    function draw() {
+      list.innerHTML =
+        '<div class="card-box" style="margin-bottom:12px"><b>Məhsulların sırası</b>' +
+        '<p class="muted" style="font-size:13px;margin:6px 0 10px">Ox düymələri ilə yerini dəyişin. Saytın ana səhifəsində və məhsullar bölməsində bu sıra ilə görünəcək (yuxarıdakı əvvəl çıxır).</p>' +
+        '<div style="display:flex;gap:8px"><button class="btn gold" id="ordSave" style="flex:1">Sıranı yadda saxla</button>' +
+        '<button class="btn" id="ordBack">Geri</button></div></div>' +
+        items.map(function (p, i) {
+          return '<div class="card-box" style="display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:6px">' +
+            '<span class="muted" style="width:24px;font-size:13px">' + (i + 1) + '</span>' +
+            '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' + (p.active ? "" : ";opacity:.5") + '">' +
+            esc(p.name_az) + (p.active ? "" : " (deaktiv)") + '</span>' +
+            '<button class="btn" data-top="' + i + '" title="Ən yuxarı">⤒</button>' +
+            '<button class="btn" data-up="' + i + '">▲</button>' +
+            '<button class="btn" data-dn="' + i + '">▼</button></div>';
+        }).join("");
+      list.querySelectorAll("[data-top]").forEach(function (b) { b.onclick = function () { move(+b.getAttribute("data-top"), 0); }; });
+      list.querySelectorAll("[data-up]").forEach(function (b) { b.onclick = function () { var i = +b.getAttribute("data-up"); move(i, i - 1); }; });
+      list.querySelectorAll("[data-dn]").forEach(function (b) { b.onclick = function () { var i = +b.getAttribute("data-dn"); move(i, i + 1); }; });
+      document.getElementById("ordBack").onclick = function () { loadProducts(); };
+      document.getElementById("ordSave").onclick = async function () {
+        this.disabled = true;
+        var r = await api("/api/admin?action=product_reorder", { method: "POST", body: { order: items.map(function (p) { return p.product_key; }) } });
+        if (r.status === 401) { expired(); return; }
+        if (!r.ok) { this.disabled = false; showMsg(fetchErr(r, "Sıra yadda saxlanmadı.")); return; }
+        await loadProducts();
+        showMsg("Sıra yadda saxlandı.");
+      };
+    }
+    draw();
+  }
+
   function renderProducts(products) {
     if (!products.length) { list.innerHTML = '<div class="empty">Məhsul yoxdur.</div>'; return; }
-    list.innerHTML = products.map(function (p) {
+    PRODUCTS = products;
+    var sortBar = '<button class="btn gold" id="sortBtn" style="width:100%;margin-bottom:12px">↕ Məhsulların sırasını dəyiş</button>';
+    list.innerHTML = sortBar + products.map(function (p) {
       var catOpts = CATS.map(function (c) {
         return '<option value="' + esc(c.key) + '"' + (c.key === p.category_key ? " selected" : "") + ">" +
           esc(c.name_az) + "</option>";
@@ -159,6 +203,7 @@
     list.querySelectorAll("[data-psave]").forEach(function (b) {
       b.onclick = function () { saveProduct(b.getAttribute("data-psave"), b); };
     });
+    document.getElementById("sortBtn").onclick = renderSortMode;
   }
 
   async function saveProduct(key, btn) {
@@ -202,6 +247,7 @@
       var me = await api("/api/admin?action=me");
       if (me.status === 401) { localStorage.removeItem(KEY); showLogin(); showMsg(""); return; }
       login.style.display = "none";
+      document.body.classList.remove("locked");
       logoutBtn.style.display = "";
       go("orders");
     } catch (e) {
@@ -215,17 +261,25 @@
       var r = await fetch("/api/admin?action=login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw.value })
+        body: JSON.stringify({ email: em.value, password: pw.value })
       });
       var d = await r.json().catch(function () { return {}; });
       if (!r.ok) { showMsg(d.error || "Xəta baş verdi."); return; }
       localStorage.setItem(KEY, d.token);
       pw.value = "";
+      em.value = "";
       start();
     } catch (e) {
       showMsg("Xəta: " + String(e && e.message || e));
     }
   };
+
+  [em, pw].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") document.getElementById("loginBtn").click();
+    });
+  });
 
   nav.addEventListener("click", function (e) {
     var b = e.target.closest("[data-sec]");
