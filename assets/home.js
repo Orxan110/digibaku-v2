@@ -65,7 +65,11 @@
     ".pprice{color:var(--gold);font-size:18px;font-weight:700;margin:0 4px}" +
     ".pprice small{color:var(--muted);font-size:12px;font-weight:400;margin-right:4px}" +
     ".pold{color:var(--muted);font-size:13px;text-decoration:line-through;margin-right:6px}" +
-    ".pbtn{margin:12px 4px 4px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}";
+    ".pbtn{margin:12px 4px 4px;display:block;text-align:center;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px;font-size:14px}" +
+    ".sk{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px}" +
+    ".sk i{display:block;border-radius:12px;background:linear-gradient(90deg,#1a1a1a 25%,#262626 50%,#1a1a1a 75%);background-size:200% 100%;animation:skm 1.2s infinite}" +
+    ".sk i.a{aspect-ratio:1/1}.sk i.b{height:14px;margin-top:12px;width:80%}.sk i.c{height:14px;margin-top:8px;width:50%}" +
+    "@keyframes skm{from{background-position:200% 0}to{background-position:-200% 0}}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
@@ -105,13 +109,13 @@
     var list = visibleProducts();
     if (!list.length) { grid.innerHTML = '<div class="empty">' + esc(t.empty) + "</div>"; return; }
     grid.className = "pgrid";
-    grid.innerHTML = list.map(function (p) {
+    grid.innerHTML = list.map(function (p, idx) {
       var prices = p.prices.slice().sort(function (a, b) { return a.months - b.months; });
       var best = prices.reduce(function (a, b) { return b.price < a.price ? b : a; }, prices[0]);
       var hasSale = prices.some(function (x) { return x.old; });
       var months = prices.map(function (x) { return x.months; }).join(" · ");
       var img = p.image_url
-        ? '<img src="' + esc(p.image_url) + '" alt="' + esc(productName(p)) + '" data-img>'
+        ? '<img src="' + esc(p.image_url) + '" alt="' + esc(productName(p)) + '" width="400" height="400" decoding="async"' + (idx < 4 ? "" : ' loading="lazy"') + ' data-img>'
         : esc(productName(p));
       var priceHtml = best.old
         ? '<div class="pprice"><small>' + esc(t.start) + '</small><span class="pold">' + best.old.toFixed(2) +
@@ -131,19 +135,39 @@
     });
   }
 
-  async function init() {
+  function showSkeleton() {
+    var g = document.getElementById("productGrid");
+    if (!g) return;
+    g.className = "pgrid";
+    g.innerHTML = new Array(8).join("|").split("|").map(function () {
+      return '<div class="sk"><i class="a"></i><i class="b"></i><i class="c"></i></div>';
+    }).join("");
+  }
+
+  function applyData(d) {
+    state.products = d.products || [];
+    state.categories = (d.categories || []).filter(function (c) { return c.key; });
+    if (state.active !== "all" && !state.categories.some(function (c) { return c.key === state.active; })) state.active = "all";
+    drawFilters();
+    drawGrid();
+  }
+
+  function init() {
     try {
       setStatic();
-      var r = await DBApi.get("/api/products");
-      if (!r.ok) {
-        document.getElementById("productGrid").innerHTML = '<div class="empty">' + esc(t.loadErr) + "</div>";
-        drawFilters();
-        return;
-      }
-      state.products = r.data.products || [];
-      state.categories = (r.data.categories || []).filter(function (c) { return c.key; });
-      drawFilters();
-      drawGrid();
+      showSkeleton();
+      DBApi.swr("/api/products", function (d) {
+        try {
+          if (!d) {
+            var g = document.getElementById("productGrid");
+            g.className = "grid";
+            g.innerHTML = '<div class="empty">' + esc(t.loadErr) + "</div>";
+            drawFilters();
+            return;
+          }
+          applyData(d);
+        } catch (e) { showErr(e); }
+      });
     } catch (e) {
       showErr(e);
     }
