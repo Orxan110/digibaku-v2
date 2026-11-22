@@ -39,12 +39,29 @@ async function sessionUser(token) {
   }
 }
 
-// İstifadəçi: { id, name, email } və ya null
-async function getUser(req) {
-  const h = req.headers.authorization || "";
-  const m = h.match(/^Bearer\s+(.+)$/);
-  if (!m) return null;
-  const token = m[1].trim();
+// 3) Cookie ilə yoxlanış: token alına bilmədikdə sessiya cookie-si ilə (eyni domen, /api/auth proxy)
+async function cookieUser(req) {
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  try {
+    const r = await fetch(NEON_BASE + "/get-session", {
+      headers: {
+        Cookie: cookie,
+        Origin: req.headers.origin || ("https://" + host),
+        Accept: "application/json"
+      }
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const u = j && j.user;
+    return u && u.id ? { id: u.id, name: u.name || null, email: u.email || null } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function bearerUser(token) {
   const p = await jwtPayload(token);
   if (p && p.sub) {
     let name = p.name || null, email = p.email || null;
@@ -56,6 +73,18 @@ async function getUser(req) {
   }
   const u = await sessionUser(token);
   return u ? { id: u.id, name: u.name || null, email: u.email || null } : null;
+}
+
+// İstifadəçi: { id, name, email } və ya null
+// Əvvəl Bearer token, alınmadısa (və ya yararsızdırsa) sessiya cookie-si yoxlanılır.
+async function getUser(req) {
+  const h = req.headers.authorization || "";
+  const m = h.match(/^Bearer\s+(.+)$/);
+  if (m) {
+    const u = await bearerUser(m[1].trim());
+    if (u) return u;
+  }
+  return cookieUser(req);
 }
 
 async function getUserId(req) {
