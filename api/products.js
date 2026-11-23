@@ -5,14 +5,28 @@ async function serveImage(req, res) {
   const id = String(req.query.img || "");
   if (!/^[a-f0-9]{32}$/.test(id)) return res.status(404).end();
   try {
-    const r = await pool.query("select mime, data from product_images where id = $1", [id]);
+    let r;
+    try {
+      r = await pool.query("select mime, data from product_images where id = $1", [id]);
+    } catch (e1) {
+      // bir dəfə təkrar cəhd (soyuq başlanğıc / bağlantı xətası)
+      r = await pool.query("select mime, data from product_images where id = $1", [id]);
+    }
     if (!r.rowCount) return res.status(404).end();
-    res.setHeader("Content-Type", r.rows[0].mime);
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    let data = r.rows[0].data;
+    if (!Buffer.isBuffer(data)) data = Buffer.from(data);
+    const etag = '"' + id + '"';
+    if (req.headers["if-none-match"] === etag) return res.status(304).end();
+    res.setHeader("Content-Type", r.rows[0].mime || "image/webp");
+    res.setHeader("Content-Length", String(data.length));
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    return res.status(200).send(r.rows[0].data);
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    return res.status(200).end(data);
   } catch (e) {
     console.error("img:", e);
+    res.setHeader("Cache-Control", "no-store");
     return res.status(500).end();
   }
 }
