@@ -84,32 +84,65 @@
 
   // ---------- ŞƏKİL (telefon və ya kompüterdən) ----------
   // Şəkil brauzerdə kiçildilir (max 1000px), WEBP/JPEG olaraq saxlanılır, sonra serverə göndərilir
-  function compressImage(file) {
+  function loadBitmap(file) {
+    // 1) createImageBitmap  2) <img> + objectURL  3) <img> + FileReader
     return new Promise(function (resolve, reject) {
-      if (!file.type || file.type.indexOf("image/") !== 0) { reject(new Error("Yalnız şəkil faylı seçin.")); return; }
-      var src = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () {
-        URL.revokeObjectURL(src);
-        var w = img.naturalWidth, h = img.naturalHeight;
-        var k = Math.min(1, 1000 / Math.max(w, h));
-        var c = document.createElement("canvas");
-        c.width = Math.max(1, Math.round(w * k));
-        c.height = Math.max(1, Math.round(h * k));
-        var ctx = c.getContext("2d");
-        ctx.drawImage(img, 0, 0, c.width, c.height);
-        var out = c.toDataURL("image/webp", 0.88);
-        if (out.indexOf("data:image/webp") !== 0) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, c.width, c.height);
-          ctx.drawImage(img, 0, 0, c.width, c.height);
-          out = c.toDataURL("image/jpeg", 0.88);
-        }
-        resolve(out);
-      };
-      img.onerror = function () { URL.revokeObjectURL(src); reject(new Error("Şəkil oxunmadı. Başqa fayl seçin.")); };
-      img.src = src;
+      function viaImg(src, revoke, next) {
+        var img = new Image();
+        img.onload = function () { if (revoke) URL.revokeObjectURL(src); resolve({ src: img, w: img.naturalWidth, h: img.naturalHeight }); };
+        img.onerror = function () { if (revoke) URL.revokeObjectURL(src); next(); };
+        img.src = src;
+      }
+      function viaReader() {
+        var fr = new FileReader();
+        fr.onload = function () { viaImg(String(fr.result), false, function () { reject(new Error("decode")); }); };
+        fr.onerror = function () { reject(new Error("decode")); };
+        fr.readAsDataURL(file);
+      }
+      function viaUrl() { viaImg(URL.createObjectURL(file), true, viaReader); }
+      if (window.createImageBitmap) {
+        createImageBitmap(file).then(function (bm) { resolve({ src: bm, w: bm.width, h: bm.height }); }, viaUrl);
+      } else viaUrl();
     });
+  }
+
+  function readRaw(file) {
+    return new Promise(function (resolve, reject) {
+      var t = String(file.type || "").toLowerCase();
+      if (!/^image\/(jpeg|png|webp)$/.test(t)) { reject(new Error("bad")); return; }
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result)); };
+      fr.onerror = function () { reject(new Error("bad")); };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  async function compressImage(file) {
+    var bm;
+    try { bm = await loadBitmap(file); }
+    catch (e) {
+      // Brauzer açmadı: JPG/PNG/WEBP-dirsə olduğu kimi göndər (server 2 MB-a qədər qəbul edir)
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error("big");
+        return await readRaw(file);
+      } catch (e2) {
+        throw new Error("Şəkil oxunmadı. Fayl HEIC/AVIF ola bilər. Telefonda şəkli JPG/PNG kimi saxlayın (və ya ekran görüntüsü alıb onu seçin) və yenidən yoxlayın.");
+      }
+    }
+    var k = Math.min(1, 1000 / Math.max(bm.w, bm.h, 1));
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bm.w * k));
+    c.height = Math.max(1, Math.round(bm.h * k));
+    var ctx = c.getContext("2d");
+    ctx.drawImage(bm.src, 0, 0, c.width, c.height);
+    var out = c.toDataURL("image/webp", 0.88);
+    if (out.indexOf("data:image/webp") !== 0) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(bm.src, 0, 0, c.width, c.height);
+      out = c.toDataURL("image/jpeg", 0.88);
+    }
+    return out;
   }
 
   var UPLOADING = 0;
