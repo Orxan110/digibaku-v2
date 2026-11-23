@@ -1,22 +1,23 @@
 /* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO, şəkil xətası qoruması. */
 (function(){
-  // Şəkil xətası: 1) keşi keçərək yenidən yoxla, 2) digər uzantıları yoxla, 3) marka yazılı nişan göstər.
-  // Beləliklə bir şəkil açılmasa belə səhifə pozulmur və yeni məhsul əlavə edəndə problem yaranmır.
+  // Şəkil xətası: 1) eyni linki (sorğu parametrləri ilə, məs. ?img=ID) gecikmə ilə yenidən yoxla,
+  // 2) yalnız faylın uzantısı varsa digər uzantıları yoxla, 3) marka yazılı nişan göstər.
   (function(){
     var EXT = ["webp", "png", "jpg", "jpeg", "avif"];
     document.addEventListener("error", function(e){
       var im = e.target;
       if(!im || im.tagName !== "IMG" || !im.hasAttribute("data-img")) return;
       var base = im.getAttribute("data-src0");
-      if(!base){ base = (im.getAttribute("src") || "").split("?")[0]; im.setAttribute("data-src0", base); }
+      if(!base){ base = im.getAttribute("src") || ""; im.setAttribute("data-src0", base); }
       var step = parseInt(im.getAttribute("data-fb") || "0", 10);
-      var cands = [base + "?cb=" + Date.now()];
-      var m = base.match(/^(.*)\.([A-Za-z0-9]+)$/);
+      var sep = base.indexOf("?") === -1 ? "?" : "&";
+      var cands = [base + sep + "cb=" + Date.now(), base + sep + "cb=" + (Date.now() + 1)];
+      var m = base.match(/^([^?#]*)\.([A-Za-z0-9]+)$/);
       if(m){ EXT.forEach(function(x){ if(x !== m[2].toLowerCase()) cands.push(m[1] + "." + x); }); }
       e.stopImmediatePropagation();
       if(step < cands.length){
         im.setAttribute("data-fb", String(step + 1));
-        im.setAttribute("src", cands[step]);
+        setTimeout(function(){ im.setAttribute("src", cands[step]); }, step === 0 ? 0 : 800);
         return;
       }
       var name = String(im.getAttribute("alt") || "").trim().split(/\s+/)[0] || "";
