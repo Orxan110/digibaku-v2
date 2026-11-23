@@ -2,6 +2,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/img/:id",
+      "destination": "/api/media?id=:id"
+    },
+    {
       "source": "/api/auth/:path*",
       "destination": "/api/shop?action=auth&p=:path*"
     },
