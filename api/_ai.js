@@ -141,9 +141,46 @@ async function history(pool, threadId) {
   return out;
 }
 
+// Provayderlər: GEMINI_API_KEY (Google, pulsuz limit var) və ya ANTHROPIC_API_KEY (Claude, ödənişli). Hansı varsa o işləyir.
+async function callGemini(key, system, messages, signal) {
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const gen = { maxOutputTokens: 700, temperature: 0.7 };
+  if (/2\.5/.test(model)) gen.thinkingConfig = { thinkingBudget: 0 };
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+    method: "POST",
+    signal: signal,
+    headers: { "content-type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: messages.map(function (m) {
+        return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] };
+      }),
+      generationConfig: gen
+    })
+  });
+  if (!r.ok) { console.error("gemini status:", r.status, (await r.text()).slice(0, 300)); return null; }
+  const j = await r.json();
+  const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  return parts.map(function (x) { return x.text || ""; }).join("").trim();
+}
+
+async function callClaude(key, system, messages, signal) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    signal: signal,
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: MODEL, max_tokens: 600, system: system, messages: messages })
+  });
+  if (!r.ok) { console.error("ai reply status:", r.status, (await r.text()).slice(0, 300)); return null; }
+  const j = await r.json();
+  return (j.content || []).filter(function (b) { return b.type === "text"; })
+    .map(function (b) { return b.text; }).join("").trim();
+}
+
 async function aiReply(pool, threadId, text, langIn) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
+  const gKey = process.env.GEMINI_API_KEY;
+  const cKey = process.env.ANTHROPIC_API_KEY;
+  if (!gKey && !cKey) return null;
   const lang = LANG_NAME[langIn] ? langIn : "az";
   try {
     const ctx = await loadContext(pool);
@@ -151,36 +188,17 @@ async function aiReply(pool, threadId, text, langIn) {
     if (!messages.length || messages[messages.length - 1].role !== "user") {
       messages.push({ role: "user", content: clip(text, 1000) });
     }
+    const system = systemPrompt(ctx, lang);
 
     const ctrl = new AbortController();
-    const timer = setTimeout(function () { ctrl.abort(); }, 7000);
-    let r;
+    const timer = setTimeout(function () { ctrl.abort(); }, 8000);
+    let out = "";
     try {
-      r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: ctrl.signal,
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 600,
-          system: systemPrompt(ctx, lang),
-          messages: messages
-        })
-      });
+      out = gKey ? await callGemini(gKey, system, messages, ctrl.signal)
+                 : await callClaude(cKey, system, messages, ctrl.signal);
     } finally {
       clearTimeout(timer);
     }
-    if (!r.ok) {
-      console.error("ai reply status:", r.status, (await r.text()).slice(0, 300));
-      return null;
-    }
-    const j = await r.json();
-    const out = (j.content || []).filter(function (b) { return b.type === "text"; })
-      .map(function (b) { return b.text; }).join("").trim();
     const fixed = out ? fixCards(out, ctx, lang) : "";
     return fixed ? fixed.slice(0, 1900) : null;
   } catch (e) {
