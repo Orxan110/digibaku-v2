@@ -288,6 +288,7 @@ module.exports = async function handler(req, res) {
   }
 
   // ---------- ŞƏKİL YÜKLƏMƏ ----------
+  // Link birbaşa API-yə gedir (/api/products?img=ID), yönləndirmədən (rewrite) asılı deyil
   if (req.method === "POST" && action === "image_upload") {
     const b = body(req);
     const m = IMG_RE.exec(String(b.data || ""));
@@ -298,7 +299,7 @@ module.exports = async function handler(req, res) {
     await ensureImages();
     const id = crypto.randomBytes(16).toString("hex");
     await pool.query("insert into product_images (id, mime, data) values ($1, $2, $3)", [id, m[1], buf]);
-    return res.status(200).json({ ok: true, url: "/img/" + id });
+    return res.status(200).json({ ok: true, url: "/api/products?img=" + id });
   }
 
   // ---------- YENİ MƏHSUL ----------
