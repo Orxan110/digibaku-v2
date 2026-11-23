@@ -290,16 +290,21 @@ module.exports = async function handler(req, res) {
   // ---------- ŞƏKİL YÜKLƏMƏ ----------
   // Link birbaşa API-yə gedir (/api/products?img=ID), yönləndirmədən (rewrite) asılı deyil
   if (req.method === "POST" && action === "image_upload") {
-    const b = body(req);
-    const m = IMG_RE.exec(String(b.data || ""));
-    if (!m) return res.status(400).json({ ok: false, error: "Yalnız JPG, PNG və ya WEBP şəkil yükləyin." });
-    const buf = Buffer.from(m[2], "base64");
-    if (!buf.length) return res.status(400).json({ ok: false, error: "Şəkil boşdur." });
-    if (buf.length > IMG_MAX_BYTES) return res.status(413).json({ ok: false, error: "Şəkil çox böyükdür (maksimum 2 MB)." });
-    await ensureImages();
-    const id = crypto.randomBytes(16).toString("hex");
-    await pool.query("insert into product_images (id, mime, data) values ($1, $2, $3)", [id, m[1], buf]);
-    return res.status(200).json({ ok: true, url: "/api/products?img=" + id });
+    try {
+      const b = body(req);
+      const m = IMG_RE.exec(String(b.data || ""));
+      if (!m) return res.status(400).json({ ok: false, error: "Yalnız JPG, PNG və ya WEBP şəkil yükləyin." });
+      const buf = Buffer.from(m[2], "base64");
+      if (!buf.length) return res.status(400).json({ ok: false, error: "Şəkil boşdur." });
+      if (buf.length > IMG_MAX_BYTES) return res.status(413).json({ ok: false, error: "Şəkil çox böyükdür (maksimum 2 MB)." });
+      await ensureImages();
+      const id = crypto.randomBytes(16).toString("hex");
+      await pool.query("insert into product_images (id, mime, data) values ($1, $2, $3)", [id, m[1], buf]);
+      return res.status(200).json({ ok: true, url: "/api/products?img=" + id });
+    } catch (e) {
+      console.error("image_upload:", e);
+      return res.status(500).json({ ok: false, error: "Şəkil bazaya yazılmadı: " + String(e && e.message || e) });
+    }
   }
 
   // ---------- YENİ MƏHSUL ----------
