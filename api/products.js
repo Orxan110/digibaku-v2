@@ -1,10 +1,28 @@
 const { pool } = require("./_db");
 
+// /img/<id> -> admin tərəfindən yüklənmiş şəkil (vercel.json: /img/:id -> /api/products?img=:id)
+async function serveImage(req, res) {
+  const id = String(req.query.img || "");
+  if (!/^[a-f0-9]{32}$/.test(id)) return res.status(404).end();
+  try {
+    const r = await pool.query("select mime, data from product_images where id = $1", [id]);
+    if (!r.rowCount) return res.status(404).end();
+    res.setHeader("Content-Type", r.rows[0].mime);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    return res.status(200).send(r.rows[0].data);
+  } catch (e) {
+    console.error("img:", e);
+    return res.status(500).end();
+  }
+}
+
 // Yalnız aktiv məhsullar. Endirim varsa: price = satış qiyməti, old = əvvəlki qiymət.
 // Həmçinin ana səhifədə göstəriləcək təsdiqlənmiş rəylər (reviews).
 const MONTHS = [1, 2, 3, 6, 12];
 
 module.exports = async function handler(req, res) {
+  if (req.method === "GET" && req.query && req.query.img) return serveImage(req, res);
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
