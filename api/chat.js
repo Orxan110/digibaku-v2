@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { pool } = require("./_db");
 const { verify } = require("./_auth");
 const { reply: botReply, TX: BOT_TX } = require("./_bot");
+const { aiReply } = require("./_ai");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,10 +38,14 @@ async function adminActive(threadId) {
 
 async function runBot(threadId, text, lang) {
   if (await adminActive(threadId)) return null;
-  let answer = await botReply(pool, text, lang);
-  const prev = await pool.query("select 1 from chat_messages where thread_id = $1 and is_bot = true limit 1", [threadId]);
-  const t = BOT_TX[lang] || BOT_TX.az;
-  if (!prev.rowCount) answer += "\n\n" + t.offline;
+  // 1) Claude ilə sərbəst söhbət; 2) açar yoxdursa / xəta olarsa qayda əsaslı bot
+  let answer = await aiReply(pool, threadId, text, lang);
+  if (!answer) {
+    answer = await botReply(pool, text, lang);
+    const prev = await pool.query("select 1 from chat_messages where thread_id = $1 and is_bot = true limit 1", [threadId]);
+    const t = BOT_TX[lang] || BOT_TX.az;
+    if (!prev.rowCount) answer += "\n\n" + t.offline;
+  }
   const m = await pool.query(
     `insert into chat_messages (thread_id, sender, body, is_bot) values ($1, 'admin', $2, true)
      returning id::int as id, sender, body, created_at, is_bot`,
