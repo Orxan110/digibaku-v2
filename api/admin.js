@@ -212,7 +212,8 @@ module.exports = async function handler(req, res) {
       "update product_prices set " + sets + ", updated_at = now() where product_key = $1 returning product_key",
       [key].concat(vals));
     if (!upd.rowCount) {
-      const ph = cols.map((c, i) => "$" + (i + 3)).join(", ");
+      // $1 = product_key, $2... = qiymət dəyərləri (update ilə eyni sıra)
+      const ph = cols.map((c, i) => "$" + (i + 2)).join(", ");
       await pool.query(
         "insert into product_prices (product_key, product_name, " + cols.join(", ") + ") " +
         "values ($1, (select name_az from site_products where product_key = $1), " + ph + ")",
