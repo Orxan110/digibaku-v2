@@ -112,11 +112,14 @@
     });
   }
 
+  var UPLOADING = 0;
+  function alertMsg(t) { showMsg(t); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} try { alert(t); } catch (e) {} }
+
   async function uploadImage(file) {
     var dataUrl = await compressImage(file);
-    var r = await api("/api/admin-products?action=image_upload", { method: "POST", body: { data: dataUrl } });
+    var r = await api("/api/admin?action=image_upload", { method: "POST", body: { data: dataUrl } });
     if (r.status === 401) { expired(); return null; }
-    if (!r.ok) throw new Error(fetchErr(r, "Şəkil yüklənmədi."));
+    if (!r.ok || !r.data || !r.data.url) throw new Error(fetchErr(r, "Şəkil yüklənmədi (server xətası " + r.status + ")."));
     return r.data.url;
   }
 
@@ -134,19 +137,25 @@
         var f = input.files && input.files[0];
         if (!f) return;
         var box = input.closest("[data-box]");
-        showMsg("Şəkil hazırlanır və yüklənir...");
+        var hidden = box.querySelector('[data-f="image_url"]');
+        var img = box.querySelector("[data-prev]");
+        showMsg("Şəkil hazırlanır və yüklənir... Gözləyin.");
+        UPLOADING++;
         try {
           var url = await uploadImage(f);
           if (url) {
-            box.querySelector('[data-f="image_url"]').value = url;
-            var img = box.querySelector("[data-prev]");
+            hidden.value = url;
+            img.onerror = function () { alertMsg("Şəkil yükləndi, amma açılmır. Yenidən seçin."); hidden.value = ""; img.style.display = "none"; };
             img.src = url;
             img.style.display = "";
-            showMsg("Şəkil yükləndi. İndi 'Yadda saxla' düyməsinə basın.");
+            showMsg("✅ Şəkil yükləndi. İndi 'Yadda saxla' / 'Məhsulu əlavə et' düyməsinə basın.");
           }
         } catch (e) {
-          showMsg(String(e && e.message || e));
+          hidden.value = "";
+          img.style.display = "none";
+          alertMsg("❌ " + String(e && e.message || e));
         }
+        UPLOADING--;
         input.value = "";
       };
     });
@@ -324,6 +333,7 @@
 
   async function createProduct(btn) {
     var box = list.querySelector('[data-box="new"]');
+    if (UPLOADING > 0) { alertMsg("Şəkil hələ yüklənir, bir az gözləyin."); return; }
     var nameAz = String(val(box, "name_az") || "").trim();
     if (!nameAz) { showMsg("Azərbaycanca ad daxil edin."); return; }
     var slug = slugify(val(box, "slug") || val(box, "name_en") || nameAz);
@@ -357,6 +367,7 @@
 
   async function saveProduct(key, btn) {
     var card = list.querySelector('[data-key="' + key + '"]');
+    if (UPLOADING > 0) { alertMsg("Şəkil hələ yüklənir, bir az gözləyin."); return; }
     btn.disabled = true;
     showMsg("");
     var prod = await api("/api/admin?action=product_save", { method: "POST", body: {
