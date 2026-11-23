@@ -3,7 +3,11 @@
   "rewrites": [
     {
       "source": "/img/:id",
-      "destination": "/api/media?id=:id"
+      "destination": "/api/products?img=:id"
+    },
+    {
+      "source": "/api/admin-products",
+      "destination": "/api/admin"
     },
     {
       "source": "/api/auth/:path*",
