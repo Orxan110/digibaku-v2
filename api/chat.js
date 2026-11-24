@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
           `select count(*)::int as n from chat_messages
            where thread_id = $1 and sender = 'visitor' and created_at > now() - interval '10 minutes'`,
           [thread.id]);
-        if (rate.rows[0].n >= 15) {
+        if (rate.rows[0].n >= 25) {
           return res.status(429).json({ ok: false, error: "Çox tez-tez mesaj göndərirsiniz. Bir az gözləyin." });
         }
       }
