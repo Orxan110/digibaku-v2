@@ -14,7 +14,14 @@ async function ensureImages() {
   }
   return imagesReady;
 }
-
+let noteColReady = null;
+async function ensureNoteCol() {
+  if (!noteColReady) {
+    noteColReady = pool.query("alter table orders add column if not exists admin_note text")
+      .catch(function (e) { noteColReady = null; throw e; });
+  }
+  return noteColReady;
+}
 const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
 const MONTHS = [1, 2, 3, 6, 12];
 const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
@@ -336,6 +343,127 @@ module.exports = async function handler(req, res) {
       [slug, nameAz, txt(b.name_ru), txt(b.name_en), cat, img, b.active !== false]);
     return res.status(200).json({ ok: true, product_key: r.rows[0].product_key });
   }
+  // ================= ADMIN-EXTRA (başlanğıc) =================
+  if (req.method === "GET" && action === "orders2") {
+    await ensureNoteCol();
+    const r = await pool.query(
+      `select o.id, o.total, o.status, o.items, o.created_at, o.admin_note, u.email, u.name
+       from orders o left join neon_auth."user" u on u.id = o.user_id
+       order by o.created_at desc limit 500`);
+    return res.status(200).json({ ok: true, orders: r.rows });
+  }
 
+  if (req.method === "GET" && action === "new_count") {
+    const r = await pool.query(
+      `select count(*) filter (where status = 'pending')::int as pending,
+              count(*)::int as total, max(created_at) as last
+       from orders`);
+    return res.status(200).json({ ok: true, pending: r.rows[0].pending, total: r.rows[0].total, last: r.rows[0].last });
+  }
+
+  if (req.method === "POST" && action === "order_note") {
+    const b = body(req);
+    await ensureNoteCol();
+    const r = await pool.query(
+      "update orders set admin_note = $2, updated_at = now() where id = $1 returning id",
+      [String(b.id), txt(b.note)]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sifariş tapılmadı." });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_toggle") {
+    const b = body(req);
+    const r = await pool.query(
+      "update site_products set active = $2 where product_key = $1 returning product_key",
+      [String(b.product_key || ""), !!b.active]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_delete") {
+    const b = body(req);
+    const key = String(b.product_key || "");
+    if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("delete from product_prices where product_key = $1", [key]);
+      const t = await client.query("select to_regclass('public.product_content') as t");
+      if (t.rows[0].t) await client.query("delete from product_content where product_key = $1", [key]);
+      const d = await client.query("delete from site_products where product_key = $1 returning product_key", [key]);
+      if (!d.rowCount) { await client.query("rollback"); return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." }); }
+      await client.query("commit");
+    } catch (e) {
+      await client.query("rollback").catch(function () {});
+      console.error("product_delete:", e);
+      return res.status(500).json({ ok: false, error: "Məhsul silinmədi: " + String(e && e.message || e) });
+    } finally {
+      client.release();
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_duplicate") {
+    const b = body(req);
+    const src = String(b.product_key || "");
+    const slug = String(b.slug || "").trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{1,79}$/.test(slug)) {
+      return res.status(400).json({ ok: false, error: "Link adı yalnız kiçik latın hərfi, rəqəm və - ola bilər (2–80 simvol)." });
+    }
+    const dup = await pool.query("select 1 from site_products where product_key = $1 or slug = $1", [slug]);
+    if (dup.rowCount) return res.status(409).json({ ok: false, error: "Bu link adı artıq istifadə olunub." });
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const ins = await client.query(
+        `insert into site_products
+           (product_key, slug, name, name_az, name_ru, name_en, category_key, image_url, active, sort_order)
+         select $2::text, $2::text, name, coalesce(name_az, name) || ' (kopya)', name_ru, name_en,
+                category_key, image_url, false,
+                (select coalesce(max(sort_order), 0) + 10 from site_products)
+         from site_products where product_key = $1`, [src, slug]);
+      if (!ins.rowCount) { await client.query("rollback"); return res.status(404).json({ ok: false, error: "Mənbə məhsul tapılmadı." }); }
+      const pc = [];
+      MONTHS.forEach(function (m) { pc.push("price_" + m + "_month", "sale_" + m + "_price", "sale_" + m + "_active"); });
+      await client.query(
+        "insert into product_prices (product_key, product_name, " + pc.join(", ") + ") " +
+        "select $2::text, (select name_az from site_products where product_key = $2), " + pc.join(", ") +
+        " from product_prices where product_key = $1", [src, slug]);
+      await client.query("commit");
+    } catch (e) {
+      await client.query("rollback").catch(function () {});
+      console.error("product_duplicate:", e);
+      return res.status(500).json({ ok: false, error: "Kopyalanmadı: " + String(e && e.message || e) });
+    } finally {
+      client.release();
+    }
+    return res.status(200).json({ ok: true, product_key: slug });
+  }
+
+  // Toplu qiymət dəyişmə: percent = +10 (10% bahalaşma) və ya -15 (15% ucuzlaşma); dry=true yalnız sayı qaytarır
+  if (req.method === "POST" && action === "price_bulk") {
+    const b = body(req);
+    const percent = Number(b.percent);
+    if (!Number.isFinite(percent) || percent === 0 || percent < -90 || percent > 300) {
+      return res.status(400).json({ ok: false, error: "Faiz -90 ilə 300 arasında olmalıdır (0 olmaz)." });
+    }
+    const cat = txt(b.category_key);
+    const where = "where product_key in (select product_key from site_products where ($2::text is null or category_key = $2::text))";
+    const factor = Number((1 + percent / 100).toFixed(4));
+    if (b.dry) {
+      const c = await pool.query("select count(*)::int as n from product_prices " + where, [factor, cat]);
+      return res.status(200).json({ ok: true, count: c.rows[0].n });
+    }
+    const sets = [];
+    MONTHS.forEach(function (m) {
+      ["price_" + m + "_month", "sale_" + m + "_price"].forEach(function (col) {
+        sets.push(col + " = case when " + col + " is null then null else round(" + col + "::numeric * $1::numeric, 2) end");
+      });
+    });
+    const u = await pool.query(
+      "update product_prices set " + sets.join(", ") + ", updated_at = now() " + where, [factor, cat]);
+    return res.status(200).json({ ok: true, count: u.rowCount });
+  }
+  // ================= ADMIN-EXTRA (son) =================
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };
