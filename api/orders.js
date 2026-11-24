@@ -2,6 +2,13 @@ const { pool, getUserId } = require("./_db");
 
 const MONTHS = [1, 2, 3, 6, 12];
 
+let dlvReady = null;
+function ensureDlv() {
+  if (!dlvReady) dlvReady = pool.query("alter table orders add column if not exists delivery_info text")
+    .catch(function (e) { dlvReady = null; throw e; });
+  return dlvReady;
+}
+
 function body(req) {
   if (!req.body) return {};
   if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch { return {}; } }
@@ -14,8 +21,11 @@ module.exports = async function handler(req, res) {
   if (!userId) return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun." });
 
   if (req.method === "GET") {
+    await ensureDlv();
     const r = await pool.query(
-      `select id, total, status, items, created_at from orders
+      `select id, total, status, items, created_at,
+              case when status = 'completed' then delivery_info end as delivery_info
+       from orders
        where user_id = $1 order by created_at desc limit 100`, [userId]);
     return res.status(200).json({ ok: true, orders: r.rows });
   }
