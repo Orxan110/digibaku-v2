@@ -6,27 +6,27 @@
   var KEY = "digibaku_chat";
   var lang = (window.DB && DB.lang) || "az";
   var TX = {
-    az: { hello: "Salam! 👋 Sualınızı yazın və ya aşağıdakı düymələrdən birini seçin.",
+    az: { hello: "Salam! 👋 Mən DigiBaku-nun çat köməkçisiyəm. Məhsullar, qiymətlər, sifariş və sayt haqqında soruşa bilərsiniz. Yazın və ya aşağıdakı düymələrdən birini seçin.",
       sub: "Avtomatik köməkçi", name: "Adınız (istəyə bağlı)",
       ph: "Mesajınızı yazın...", send: "Göndər", bot: "DigiBaku · avto cavab", op: "DigiBaku · operator",
       err: "Mesaj göndərilmədi. Bir az sonra yenidən cəhd edin.", today: "Bu gün", yest: "Dünən",
       newChat: "Yeni söhbət", confirmNew: "Yeni söhbət başladılsın? Əvvəlki yazışma bu cihazdan silinəcək.",
-      q: ["Məhsullar", "Qiymətlər", "Necə sifariş edim?", "Operatorla əlaqə"],
-      qs: ["Hansı məhsullar var?", "Qiymətlər nə qədərdir?", "Necə sifariş edim?", "Operator ilə danışmaq istəyirəm"] },
-    ru: { hello: "Здравствуйте! 👋 Напишите вопрос или выберите кнопку ниже.",
+      q: ["Salam, necəsən?", "Saytınız haqqında", "Məhsullar", "Qiymətlər", "Necə sifariş edim?", "Operator"],
+      qs: ["Salam, necəsən?", "Saytınız haqqında danışın", "Hansı məhsullar var?", "Qiymətlər nə qədərdir?", "Necə sifariş edim?", "Operator ilə danışmaq istəyirəm"] },
+    ru: { hello: "Здравствуйте! 👋 Я помощник DigiBaku. Спросите о товарах, ценах, заказе или о сайте. Напишите вопрос или выберите кнопку ниже.",
       sub: "Авто-помощник", name: "Ваше имя (необязательно)",
       ph: "Напишите сообщение...", send: "Отправить", bot: "DigiBaku · авто-ответ", op: "DigiBaku · оператор",
       err: "Сообщение не отправлено. Попробуйте позже.", today: "Сегодня", yest: "Вчера",
       newChat: "Новый чат", confirmNew: "Начать новый чат? Прежняя переписка будет удалена с этого устройства.",
-      q: ["Товары", "Цены", "Как заказать?", "Связь с оператором"],
-      qs: ["Какие есть товары?", "Сколько стоят товары?", "Как заказать?", "Хочу поговорить с оператором"] },
-    en: { hello: "Hello! 👋 Write your question or pick a button below.",
+      q: ["Привет, как дела?", "О сайте", "Товары", "Цены", "Как заказать?", "Оператор"],
+      qs: ["Здравствуйте, как дела?", "Расскажите о сайте", "Какие есть товары?", "Сколько стоят товары?", "Как заказать?", "Хочу поговорить с оператором"] },
+    en: { hello: "Hello! 👋 I'm the DigiBaku chat assistant. Ask about products, prices, ordering or the site. Write your question or pick a button below.",
       sub: "Auto assistant", name: "Your name (optional)",
       ph: "Type your message...", send: "Send", bot: "DigiBaku · auto reply", op: "DigiBaku · operator",
       err: "Message could not be sent. Please try again later.", today: "Today", yest: "Yesterday",
       newChat: "New chat", confirmNew: "Start a new chat? The previous conversation will be removed from this device.",
-      q: ["Products", "Prices", "How to order?", "Talk to operator"],
-      qs: ["What products do you have?", "How much do products cost?", "How to order?", "I want to talk to an operator"] }
+      q: ["Hi, how are you?", "About the site", "Products", "Prices", "How to order?", "Operator"],
+      qs: ["Hi, how are you?", "Tell me about the site", "What products do you have?", "How much do products cost?", "How to order?", "I want to talk to an operator"] }
   };
   var t = TX[lang] || TX.az;
 
