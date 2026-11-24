@@ -3,6 +3,7 @@
   if (!AD) return;
   var esc = AD.esc, api = AD.api, val = AD.val, showMsg = AD.showMsg;
   var fetchErr = AD.fetchErr, expired = AD.expired, INP = AD.INP, list = AD.list;
+  var fileRow = AD.fileRow, bindFiles = AD.bindFiles;
   var URL_PATH = "/api/admin-banners?action=";
 
   function field(label, f, v) {
@@ -12,7 +13,7 @@
 
   function bannerCard(b, isNew) {
     var id = isNew ? "" : b.id;
-    return '<div class="card-box" data-bid="' + esc(id) + '" style="margin-bottom:12px">' +
+    return '<div class="card-box" data-bid="' + esc(id) + '" data-box="1" style="margin-bottom:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
       "<b>" + (isNew ? "Yeni banner" : esc(b.title_az)) + "</b>" +
       '<label class="muted" style="font-size:13px"><input data-f="active" type="checkbox"' +
@@ -27,7 +28,9 @@
       field("Düymə yazısı (RU)", "cta_label_ru", b && b.cta_label_ru) +
       field("Düymə yazısı (EN)", "cta_label_en", b && b.cta_label_en) +
       field("Düymə linki (məs: products.html)", "cta_url", b && b.cta_url) +
-      field("Şəkil URL-i (istəyə bağlı)", "image_url", b && b.image_url) +
+      '<label class="muted" style="font-size:12px">Banner şəkli</label>' +
+      fileRow(b && b.image_url) +
+      field("və ya şəkil URL-i (istəyə bağlı)", "image_url", b && b.image_url) +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
       '<div><label class="muted" style="font-size:12px">Sıra</label>' +
       '<input data-f="sort_order" type="number" value="' + esc(b ? b.sort_order : 0) + '" style="' + INP + '"></div>' +
@@ -78,6 +81,7 @@
     list.querySelectorAll("[data-bdel]").forEach(function (b) {
       b.onclick = function () { deleteBanner(b.closest("[data-bid]")); };
     });
+    bindFiles(list);
   }
 
   async function loadBanners() {
