@@ -22,6 +22,22 @@ async function ensureNoteCol() {
   }
   return noteColReady;
 }
+let delColReady = null;
+async function ensureDelCol() {
+  if (!delColReady) {
+    delColReady = pool.query("alter table site_products add column if not exists deleted_at timestamptz")
+      .catch(function (e) { delColReady = null; throw e; });
+  }
+  return delColReady;
+}
+let dlvColReady = null;
+async function ensureDeliveryCol() {
+  if (!dlvColReady) {
+    dlvColReady = pool.query("alter table orders add column if not exists delivery_info text")
+      .catch(function (e) { dlvColReady = null; throw e; });
+  }
+  return dlvColReady;
+}
 const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
 const MONTHS = [1, 2, 3, 6, 12];
 const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
@@ -143,6 +159,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "GET" && action === "products") {
+    await ensureDelCol();
     const cats = await pool.query("select key, name_az from categories order by sort_order, name_az");
     const prods = await pool.query(
       `select p.product_key, p.name_az, p.name_ru, p.name_en, p.category_key, p.image_url, p.active, p.sort_order,
@@ -151,6 +168,7 @@ module.exports = async function handler(req, res) {
               pp.sale_1_active, pp.sale_2_active, pp.sale_3_active, pp.sale_6_active, pp.sale_12_active
        from site_products p
        left join product_prices pp on pp.product_key = p.product_key
+       where p.deleted_at is null
        order by p.sort_order, p.name_az`);
     return res.status(200).json({ ok: true, categories: cats.rows, products: prods.rows });
   }
@@ -346,8 +364,9 @@ module.exports = async function handler(req, res) {
   // ================= ADMIN-EXTRA (başlanğıc) =================
   if (req.method === "GET" && action === "orders2") {
     await ensureNoteCol();
+    await ensureDeliveryCol();
     const r = await pool.query(
-      `select o.id, o.total, o.status, o.items, o.created_at, o.admin_note, u.email, u.name
+      `select o.id, o.total, o.status, o.items, o.created_at, o.admin_note, o.delivery_info, u.email, u.name
        from orders o left join neon_auth."user" u on u.id = o.user_id
        order by o.created_at desc limit 500`);
     return res.status(200).json({ ok: true, orders: r.rows });
@@ -380,23 +399,50 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  if (req.method === "GET" && action === "products_trash") {
+    await ensureDelCol();
+    const r = await pool.query(
+      "select product_key, name_az, deleted_at from site_products where deleted_at is not null order by deleted_at desc");
+    return res.status(200).json({ ok: true, products: r.rows });
+  }
+
   if (req.method === "POST" && action === "product_delete") {
-    const b = body(req);
-    const key = String(b.product_key || "");
+    await ensureDelCol();
+    const key = String(body(req).product_key || "");
+    if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
+    const r = await pool.query(
+      "update site_products set deleted_at = now(), active = false where product_key = $1 and deleted_at is null returning product_key", [key]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_restore") {
+    await ensureDelCol();
+    const key = String(body(req).product_key || "");
+    const r = await pool.query(
+      "update site_products set deleted_at = null, active = false where product_key = $1 and deleted_at is not null returning product_key", [key]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "product_purge") {
+    await ensureDelCol();
+    const key = String(body(req).product_key || "");
     if (!key) return res.status(400).json({ ok: false, error: "Məhsul açarı yoxdur." });
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const chk = await client.query("select 1 from site_products where product_key = $1 and deleted_at is not null", [key]);
+      if (!chk.rowCount) { await client.query("rollback"); return res.status(404).json({ ok: false, error: "Silinmişlər arasında tapılmadı." }); }
       await client.query("delete from product_prices where product_key = $1", [key]);
       const t = await client.query("select to_regclass('public.product_content') as t");
       if (t.rows[0].t) await client.query("delete from product_content where product_key = $1", [key]);
-      const d = await client.query("delete from site_products where product_key = $1 returning product_key", [key]);
-      if (!d.rowCount) { await client.query("rollback"); return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." }); }
+      await client.query("delete from site_products where product_key = $1", [key]);
       await client.query("commit");
     } catch (e) {
       await client.query("rollback").catch(function () {});
-      console.error("product_delete:", e);
-      return res.status(500).json({ ok: false, error: "Məhsul silinmədi: " + String(e && e.message || e) });
+      console.error("product_purge:", e);
+      return res.status(500).json({ ok: false, error: "Silinmədi: " + String(e && e.message || e) });
     } finally {
       client.release();
     }
@@ -448,10 +494,11 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Faiz -90 ilə 300 arasında olmalıdır (0 olmaz)." });
     }
     const cat = txt(b.category_key);
-    const where = "where product_key in (select product_key from site_products where ($2::text is null or category_key = $2::text))";
+    await ensureDelCol();
+    const where = "where product_key in (select product_key from site_products where deleted_at is null and ($2::text is null or category_key = $2::text))";
     const factor = Number((1 + percent / 100).toFixed(4));
     if (b.dry) {
-      const c = await pool.query("select count(*)::int as n from product_prices " + where, [factor, cat]);
+      const c = await pool.query("select count(*)::int as n from product_prices " + where + " and $1::numeric > 0", [factor, cat]);
       return res.status(200).json({ ok: true, count: c.rows[0].n });
     }
     const sets = [];
@@ -463,6 +510,15 @@ module.exports = async function handler(req, res) {
     const u = await pool.query(
       "update product_prices set " + sets.join(", ") + ", updated_at = now() " + where, [factor, cat]);
     return res.status(200).json({ ok: true, count: u.rowCount });
+  }
+  if (req.method === "POST" && action === "order_delivery") {
+    const b = body(req);
+    await ensureDeliveryCol();
+    const r = await pool.query(
+      "update orders set delivery_info = $2, updated_at = now() where id = $1 returning id",
+      [String(b.id), txt(b.info)]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sifariş tapılmadı." });
+    return res.status(200).json({ ok: true });
   }
   // ================= ADMIN-EXTRA (son) =================
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
