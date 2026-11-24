@@ -485,7 +485,8 @@
 
   window.AD = {
     list: list, msg: msg, esc: esc, api: api, val: val, showMsg: showMsg,
-    fetchErr: fetchErr, expired: expired, INP: INP, MONTHS: MONTHS
+    fetchErr: fetchErr, expired: expired, INP: INP, MONTHS: MONTHS,
+    fileRow: fileRow, bindFiles: bindFiles, uploadImage: uploadImage
   };
 
   document.addEventListener("DOMContentLoaded", function () {
