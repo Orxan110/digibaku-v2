@@ -76,7 +76,7 @@
   function go(sec) {
     setActive(sec);
     showMsg("");
-    if (sec === "orders") loadOrders();
+        if (sec === "orders") (window.AD.loadOrdersPro || loadOrders)();
     else if (sec === "products") loadProducts();
     else if (sec === "categories") window.AD.loadCategories();
     else if (sec === "faq") window.AD.loadFaqs();
