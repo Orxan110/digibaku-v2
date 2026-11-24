@@ -135,7 +135,9 @@
       '<button type="button" class="btn" data-copy="' + esc(o.id) + '" style="flex:1">📋 Kopyala</button></div>' +
       '<textarea data-note="' + esc(o.id) + '" rows="2" placeholder="Daxili qeyd (yalnız sizə görünür)..." style="' + INP +
       ';resize:vertical">' + esc(o.admin_note || "") + "</textarea>" +
-      '<button type="button" class="btn" data-savenote="' + esc(o.id) + '" style="margin-top:6px">💾 Qeydi saxla</button></div>';
+      '<button type="button" class="btn" data-savenote="' + esc(o.id) + '" style="margin-top:6px">💾 Qeydi saxla</button>' +
+      '<textarea data-dlv="' + esc(o.id) + '" rows="3" placeholder="Müştəriyə görünəcək hesab məlumatı (login / parol). «Hazırdır» olanda orders səhifəsində çıxır..." style="' + INP + ';resize:vertical;margin-top:12px">' + esc(o.delivery_info || "") + "</textarea>" +
+      '<button type="button" class="btn gold" data-savedlv="' + esc(o.id) + '" style="margin-top:6px">🔑 Hesab məlumatını saxla</button></div>';
   }
 
   function findOrder(id) {
@@ -198,6 +200,14 @@
         var on = findOrder(id);
         if (on) on.admin_note = ta.value.trim() || null;
         showMsg("💾 Qeyd saxlandı: #" + shortId(id));
+      } else if ((id = b.getAttribute("data-savedlv"))) {
+        var tdl = box.querySelector('textarea[data-dlv="' + id + '"]');
+        var rd = await api("/api/admin?action=order_delivery", { method: "POST", body: { id: id, info: tdl.value } });
+        if (rd.status === 401) { expired(); return; }
+        if (!rd.ok) { showMsg(fetchErr(rd, "Saxlanmadı.")); return; }
+        var od = findOrder(id);
+        if (od) od.delivery_info = tdl.value.trim() || null;
+        showMsg("🔑 Hesab məlumatı saxlandı: #" + shortId(id));
       }
     };
     document.getElementById("opChips").onclick = function (e) {
@@ -337,7 +347,8 @@
       '<button type="button" class="btn gold" id="bkGo" style="width:100%">Tətbiq et</button></div>' +
       '<div class="card-box" style="margin-bottom:10px"><b>📦 Məhsul idarəsi</b>' +
       '<input id="pqIn" placeholder="Məhsul axtar..." value="' + esc(pq) + '" style="' + INP + ';margin-top:8px"></div>' +
-      '<div id="pqList">' + prodRowsHtml() + "</div>";
+      '<div id="pqList">' + prodRowsHtml() + "</div>" +
+      '<button type="button" class="btn" id="trashBtn" style="width:100%;margin-top:12px">♻️ Silinənlər</button><div id="trashBox" style="margin-top:8px"></div>';
 
     document.getElementById("pqIn").oninput = function () {
       pq = this.value;
@@ -366,6 +377,41 @@
       document.getElementById("bkPct").value = "";
     };
 
+    async function loadTrash() {
+      var box = document.getElementById("trashBox");
+      var rt = await api("/api/admin?action=products_trash");
+      if (rt.status === 401) { expired(); return; }
+      if (!rt.ok) { showMsg(fetchErr(rt, "Yüklənmədi.")); return; }
+      var rows = rt.data.products || [];
+      box.innerHTML = rows.length ? rows.map(function (p) {
+        return '<div class="card-box" style="margin-bottom:8px;padding:10px 12px"><b>' + esc(p.name_az || p.product_key) + "</b>" +
+          '<div class="muted" style="font-size:12px">' + esc(p.product_key) + " · " + esc(new Date(p.deleted_at).toLocaleString("az-AZ")) + "</div>" +
+          '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' +
+          '<button type="button" class="btn gold" data-rs="' + esc(p.product_key) + '">♻️ Bərpa et</button>' +
+          '<button type="button" class="btn" data-pg="' + esc(p.product_key) + '" style="color:#f87171">❌ Həmişəlik sil</button></div></div>';
+      }).join("") : '<div class="empty">Silinmiş məhsul yoxdur.</div>';
+    }
+    document.getElementById("trashBtn").onclick = loadTrash;
+    document.getElementById("trashBox").onclick = async function (e) {
+      var b = e.target.closest("button");
+      if (!b) return;
+      var k;
+      if ((k = b.getAttribute("data-rs"))) {
+        var ra = await api("/api/admin?action=product_restore", { method: "POST", body: { product_key: k } });
+        if (ra.status === 401) { expired(); return; }
+        if (!ra.ok) { showMsg(fetchErr(ra, "Bərpa olunmadı.")); return; }
+        showMsg("♻️ Bərpa olundu (gizli rejimdə): " + k + ". «Göstər» ilə aktiv edin.");
+        loadTools();
+      } else if ((k = b.getAttribute("data-pg"))) {
+        if (!confirm("Həmişəlik silinsin? Bunu geri qaytarmaq olmaz.")) return;
+        var rb = await api("/api/admin?action=product_purge", { method: "POST", body: { product_key: k } });
+        if (rb.status === 401) { expired(); return; }
+        if (!rb.ok) { showMsg(fetchErr(rb, "Silinmədi.")); return; }
+        showMsg("❌ Həmişəlik silindi: " + k);
+        loadTrash();
+      }
+    };
+
     document.getElementById("pqList").onclick = async function (e) {
       var b = e.target.closest("button");
       if (!b) return;
@@ -388,7 +434,7 @@
         loadTools();
       } else if ((key = b.getAttribute("data-del"))) {
         var p = PRODS.filter(function (x) { return x.product_key === key; })[0] || {};
-        if (!confirm("«" + (p.name_az || key) + "» həmişəlik silinsin? Qiymətləri və məzmunu da silinəcək. Geri qaytarmaq olmaz.\n\nSadəcə gizlətmək istəyirsinizsə 'Ləğv et' basın və «Gizlət» düyməsindən istifadə edin.")) return;
+        if (!confirm("«" + (p.name_az || key) + "» silinsin? «Silinənlər» bölməsindən geri qaytara bilərsiniz.")) return;
         var r3 = await api("/api/admin?action=product_delete", { method: "POST", body: { product_key: key } });
         if (r3.status === 401) { expired(); return; }
         if (!r3.ok) { showMsg(fetchErr(r3, "Silinmədi.")); return; }
