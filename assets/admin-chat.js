@@ -12,12 +12,22 @@
   function stop() { if (timer) { clearInterval(timer); timer = null; } current = null; }
   // ---------- Emoji seçimi ----------
   var EMO_CATS = [
+    { i: "🕘", recent: true },
     { i: "✨", all: true },
     { i: "😀", l: "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 😉 😍 🥰 😘 😋 😎 🤩 🥳 🤗 🤔 😐 😴 😢 😭 😡 😱 🙄 😬 🤯 🥺 😏" },
     { i: "👍", l: "👍 👎 👌 ✌️ 🤞 🤝 👏 🙌 💪 👋 🙏 👀 🤙 ☝️ 👉 👈" },
     { i: "❤️", l: "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯 ✨ ⭐ 🔥 🎉 ✅ ❌ ⚠️ ❓ ❗ 💬" },
     { i: "🎁", l: "🎁 📎 📷 💳 💰 🛒 📦 🚀 🎧 🎬 🎮 📚 💻 📱 🔑 🔒 ⏰ 📅 📧 🌐" }
   ];
+  var RECENT_KEY = "digibaku_admin_recent";
+  function getRecent() {
+    try { var a = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(a) ? a.slice(0, 20) : []; } catch (e) { return []; }
+  }
+  function pushRecent(em) {
+    var a = getRecent().filter(function (x) { return x !== em; });
+    a.unshift(em);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(a.slice(0, 20))); } catch (e) {}
+  }
   function setupEmoji(ta) {
     var box = document.getElementById("adEmoBox"), btn = document.getElementById("adEmo");
     if (!box || !btn || !ta) return;
@@ -27,7 +37,7 @@
     grid.style.cssText = "display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-height:170px;overflow-y:auto;padding:8px";
     box.appendChild(tabs);
     box.appendChild(grid);
-    var cur = 0;
+    var cur = 1;   // 1 = "Hamısı"
     function paint() {
       Array.prototype.forEach.call(tabs.children, function (b, idx) {
         b.style.borderBottomColor = idx === cur ? "#d4af37" : "transparent";
@@ -35,7 +45,8 @@
       });
       grid.innerHTML = "";
       var c = EMO_CATS[cur], list = [];
-      if (c.all) EMO_CATS.forEach(function (x) { if (x.l) list = list.concat(x.l.split(" ")); });
+      if (c.recent) list = getRecent();
+      else if (c.all) EMO_CATS.forEach(function (x) { if (x.l) list = list.concat(x.l.split(" ")); });
       else list = c.l.split(" ");
       list.forEach(function (em) {
         var b = document.createElement("button");
@@ -48,6 +59,7 @@
           if (ta.value.length - (en - st) + em.length > (ta.maxLength > 0 ? ta.maxLength : 2000)) return;
           ta.setRangeText(em, st, en, "end");
           ta.dispatchEvent(new Event("input", { bubbles: true }));
+          pushRecent(em);
           ta.focus();
         };
         grid.appendChild(b);
@@ -64,7 +76,7 @@
     btn.onclick = function () {
       var show = box.style.display === "none";
       box.style.display = show ? "block" : "none";
-      if (show) { cur = 0; paint(); }
+      if (show) { cur = 1; paint(); }
     };
   }
   // Kənara basanda emoji siyahısı bağlansın
