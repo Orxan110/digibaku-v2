@@ -35,7 +35,9 @@
     set = set || {};
     var g = HEX.test(set.color_gold || "") ? set.color_gold : "";
     var s = HEX.test(set.color_sale || "") ? set.color_sale : "";
-    try { localStorage.setItem("digibaku_theme", JSON.stringify({ g: g, s: s })); } catch (e) {}
+    var b = HEX.test(set.color_bg || "") ? set.color_bg : "";
+    var c = HEX.test(set.color_card || "") ? set.color_card : "";
+    try { localStorage.setItem("digibaku_theme", JSON.stringify({ g: g, s: s, b: b, c: c })); } catch (e) {}
     paint(g, s);
   }
 
