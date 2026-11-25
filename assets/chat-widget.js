@@ -271,6 +271,7 @@
   // ---------- Emoji (kateqoriyalar + son istifadə olunanlar) ----------
   var CATS = [
     { i: "🕘", recent: true },
+    { i: "✨", all: true },
     { i: "😀", list: "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 😉 😍 🥰 😘 😋 😎 🤩 🥳 🤗 🤔 😐 😴 😢 😭 😡 😱 🙄 😬 🤯 🥺 😏" },
     { i: "👍", list: "👍 👎 👌 ✌️ 🤞 🤝 👏 🙌 💪 👋 🙏 👀 🤙 ☝️ 👉 👈" },
     { i: "❤️", list: "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯 ✨ ⭐ 🔥 🎉 ✅ ❌ ⚠️ ❓ ❗ 💬" },
@@ -295,7 +296,7 @@
     a.unshift(em);
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(a.slice(0, 16))); } catch (e) {}
   }
-  var curCat = 1;
+  var curCat = 1;   // 1 = "Hamısı" (bütün emojilər)
   function insertEmoji(em) {
     var tx = document.getElementById("chatText");
     if (!tx) return;
@@ -319,7 +320,10 @@
     });
     emoGrid.innerHTML = "";
     var c = CATS[curCat];
-    var list = c.recent ? getRecent() : c.list.split(" ");
+    var list;
+    if (c.recent) list = getRecent();
+    else if (c.all) { list = []; CATS.forEach(function (x) { if (x.list) list = list.concat(x.list.split(" ")); }); }
+    else list = c.list.split(" ");
     if (!list.length) {
       var em0 = document.createElement("div");
       em0.className = "emo-empty";
@@ -343,7 +347,7 @@
     var show = !emoOpen();
     if (show) {
       hideMenu();
-      curCat = getRecent().length ? 0 : 1;
+      curCat = 1;
       renderEmoji();
     }
     emoBox.classList.toggle("show", show);
