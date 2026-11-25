@@ -8,6 +8,7 @@
   var TX = {
     az: { hello: "Salam! 👋 Mən DigiBaku-nun çat köməkçisiyəm. Məhsullar, qiymətlər, sifariş və sayt haqqında soruşa bilərsiniz. Yazın və ya aşağıdakı düymələrdən birini seçin.",
       sub: "Avtomatik köməkçi", name: "Adınız (istəyə bağlı)",
+      rateQ: "Xidmətimizi qiymətləndirin", up: "👍 Yaxşı idi", down: "👎 Yaxşı deyildi", thanks: "Təşəkkür edirik! 🙏",
       ph: "Mesajınızı yazın...", send: "Göndər", bot: "DigiBaku · avto cavab", op: "DigiBaku · operator",
       err: "Mesaj göndərilmədi. Bir az sonra yenidən cəhd edin.", today: "Bu gün", yest: "Dünən",
       newChat: "Yeni söhbət", confirmNew: "Yeni söhbət başladılsın? Əvvəlki yazışma bu cihazdan silinəcək.",
@@ -15,6 +16,7 @@
       qs: ["Salam, necəsən?", "Saytınız haqqında danışın", "Hansı məhsullar var?", "Qiymətlər nə qədərdir?", "Necə sifariş edim?", "Operator ilə danışmaq istəyirəm"] },
     ru: { hello: "Здравствуйте! 👋 Я помощник DigiBaku. Спросите о товарах, ценах, заказе или о сайте. Напишите вопрос или выберите кнопку ниже.",
       sub: "Авто-помощник", name: "Ваше имя (необязательно)",
+      rateQ: "Оцените наш сервис", up: "👍 Хорошо", down: "👎 Плохо", thanks: "Спасибо! 🙏",
       ph: "Напишите сообщение...", send: "Отправить", bot: "DigiBaku · авто-ответ", op: "DigiBaku · оператор",
       err: "Сообщение не отправлено. Попробуйте позже.", today: "Сегодня", yest: "Вчера",
       newChat: "Новый чат", confirmNew: "Начать новый чат? Прежняя переписка будет удалена с этого устройства.",
@@ -22,6 +24,7 @@
       qs: ["Здравствуйте, как дела?", "Расскажите о сайте", "Какие есть товары?", "Сколько стоят товары?", "Как заказать?", "Хочу поговорить с оператором"] },
     en: { hello: "Hello! 👋 I'm the DigiBaku chat assistant. Ask about products, prices, ordering or the site. Write your question or pick a button below.",
       sub: "Auto assistant", name: "Your name (optional)",
+      rateQ: "Rate our support", up: "👍 Good", down: "👎 Bad", thanks: "Thank you! 🙏",
       ph: "Type your message...", send: "Send", bot: "DigiBaku · auto reply", op: "DigiBaku · operator",
       err: "Message could not be sent. Please try again later.", today: "Today", yest: "Yesterday",
       newChat: "New chat", confirmNew: "Start a new chat? The previous conversation will be removed from this device.",
@@ -45,6 +48,8 @@
   try { token = localStorage.getItem(KEY) || ""; } catch (e) {}
   var lastId = 0, seen = {}, lastDay = "", sending = false, typingEl = null;
   var timer = null, lastActivity = Date.now();
+  var DRAFT_KEY = "digibaku_chat_draft", SEEN_KEY = "digibaku_chat_seen", RATE_KEY = "digibaku_chat_rate";
+  var rated = null, rateEl = null, hasOp = false, lastMsgAt = 0, lastSender = "", threadStatus = "open", opTyping = false;
   var ready = false;   // ilk yükləmədən sonra gələn yeni mesajlarda səs çalınır
 
   function fmtTime(d) {
@@ -62,6 +67,9 @@
     try { return x.toLocaleDateString(lang === "az" ? "az-AZ" : lang, { day: "numeric", month: "long" }); } catch (e) { return ""; }
   }
   function scrollDown() { box.scrollTop = box.scrollHeight; }
+  function saveDraft(v) {
+    try { if (v) localStorage.setItem(DRAFT_KEY, v); else localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  }
   function autosize() {
     textEl.style.height = "auto";
     textEl.style.height = Math.min(textEl.scrollHeight, 120) + "px";
@@ -174,6 +182,7 @@
 
     var now = new Date().toISOString();
     addDay(now);
+    removeRate();
     var pend = bubble({ sender: "visitor", body: "📎 " + file.name, created_at: now }, true);
     box.appendChild(pend);
     scrollDown();
@@ -210,7 +219,7 @@
   }
 
   function addMessages(list) {
-    var added = false, incoming = false;
+    var added = false, inCount = 0;
     list.forEach(function (m) {
       if (!m || seen[m.id]) return;
       seen[m.id] = true;
@@ -218,11 +227,70 @@
       addDay(m.created_at);
       box.appendChild(bubble(m, false));
       added = true;
-      if (m.sender !== "visitor") incoming = true;
+      lastSender = m.sender;
+      var ts = Date.parse(m.created_at);
+      if (ts) lastMsgAt = ts;
+      if (m.sender === "visitor") { removeRate(); }
+      else {
+        inCount++;
+        if (!m.is_bot) hasOp = true;
+      }
     });
-    if (added) scrollDown();
-    if (added && incoming && ready && window.__dbChatSound) window.__dbChatSound.play();
+    if (added) {
+      scrollDown();
+      var N = window.__dbChatNotify, pn = document.getElementById("dbChatPanel");
+      var open = !!(pn && pn.classList.contains("open"));
+      if (N) { if (open) N.seen(lastId); else if (inCount && ready) N.incoming(inCount); }
+      if (inCount && ready && window.__dbChatSound) window.__dbChatSound.play();
+    }
     return added;
+  }
+
+  // ---------- Qiymətləndirmə ----------
+  function removeRate() {
+    if (rateEl && rateEl.parentNode) rateEl.parentNode.removeChild(rateEl);
+    rateEl = null;
+  }
+  async function sendRate(v) {
+    try {
+      var r = await fetch("/api/chat?action=rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token, value: v })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok || !d.ok) throw new Error(t.err);
+      rated = v;
+      if (rateEl) { rateEl.textContent = t.thanks; scrollDown(); }
+    } catch (e) {
+      errEl.textContent = t.err;
+    }
+  }
+  function showRate() {
+    try { sessionStorage.setItem(RATE_KEY, token); } catch (e) {}
+    rateEl = document.createElement("div");
+    rateEl.className = "cm-rate";
+    var q = document.createElement("span");
+    q.textContent = t.rateQ;
+    var row = document.createElement("div");
+    [[1, t.up], [-1, t.down]].forEach(function (x) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = x[1];
+      b.onclick = function () { sendRate(x[0]); };
+      row.appendChild(b);
+    });
+    rateEl.appendChild(q);
+    rateEl.appendChild(row);
+    box.appendChild(rateEl);
+    scrollDown();
+  }
+  // Operator cavab veribsə və söhbət bağlanıbsa (və ya 5 dəqiqə sakitdirsə) bir dəfə soruşulur
+  function maybeRate() {
+    if (!token || rated !== null || rateEl || !hasOp || lastSender !== "admin") return;
+    try { if (sessionStorage.getItem(RATE_KEY) === token) return; } catch (e) {}
+    if (threadStatus !== "closed" && Date.now() - lastMsgAt < 300000) return;
+    showRate();
   }
 
   function showTyping() {
@@ -251,6 +319,8 @@
   function reset() {
     try { localStorage.removeItem(KEY); } catch (e) {}
     token = ""; lastId = 0; seen = {}; lastDay = ""; ready = true;
+    rated = null; rateEl = null; hasOp = false; lastMsgAt = 0; lastSender = ""; threadStatus = "open"; opTyping = false; typingEl = null;
+    try { localStorage.removeItem(SEEN_KEY); } catch (e) {}
     box.innerHTML = "";
     intro();
     nameEl.style.display = "";
@@ -264,8 +334,15 @@
       var d = await r.json();
       if (sending) return;
       if (d.notfound) { reset(); return; }
-      if (d.messages && addMessages(d.messages)) lastActivity = Date.now();
+      var hasNew = !!(d.messages && d.messages.length);
+      // "Operator yazır..." göstəricisi yeni mesaj gələndə və ya yazmağı dayandıranda silinir
+      if (opTyping && (hasNew || !d.typing)) { hideTyping(); opTyping = false; }
+      if (hasNew && addMessages(d.messages)) lastActivity = Date.now();
       ready = true;
+      threadStatus = d.status || threadStatus;
+      if (d.rating !== undefined && d.rating !== null) rated = d.rating;
+      if (d.typing && !typingEl) { showTyping(); opTyping = true; }
+      maybeRate();
     } catch (e) {}
   }
 
@@ -289,7 +366,8 @@
     addDay(now);
     var pend = bubble({ sender: "visitor", body: text, created_at: now }, true);
     box.appendChild(pend);
-    if (fromInput) { textEl.value = ""; autosize(); }
+    if (fromInput) { textEl.value = ""; autosize(); saveDraft(""); }
+    removeRate();
     showTyping();
 
     try {
@@ -313,7 +391,7 @@
     } catch (e) {
       if (pend.parentNode) pend.parentNode.removeChild(pend);
       hideTyping();
-      if (fromInput) { textEl.value = text; autosize(); }
+      if (fromInput) { textEl.value = text; autosize(); saveDraft(text); }
       errEl.textContent = (e && e.message && e.message !== "Failed to fetch") ? e.message : t.err;
     }
     sending = false;
@@ -372,6 +450,50 @@
     }
     if (n < 25) setTimeout(function () { waSync(n + 1); }, 400);
   })(0);
+
+  textEl.addEventListener("input", function () { saveDraft(textEl.value); });
+  try {
+    var dr = localStorage.getItem(DRAFT_KEY);
+    if (dr) { textEl.value = dr; autosize(); }
+  } catch (e) {}
+
+  // Ctrl+V ilə şəkil/fayl yapışdırma və sürüşdürüb buraxma
+  function withName(f) {
+    if (f.name && /\.[A-Za-z0-9]{1,5}$/.test(f.name)) return f;
+    var ext = ((f.type || "image/png").split("/")[1] || "png").replace("jpeg", "jpg");
+    try { return new File([f], "image-" + Date.now() + "." + ext, { type: f.type }); } catch (e) { return f; }
+  }
+  textEl.addEventListener("paste", function (e) {
+    var cd = e.clipboardData;
+    if (!cd || !cd.files || !cd.files.length) return;
+    if (cd.getData("text/plain")) return;     // mətn də varsa adi yapışdırma
+    e.preventDefault();
+    sendFile(withName(cd.files[0]));
+  });
+  var panelEl = document.getElementById("dbChatPanel"), dragN = 0;
+  function hasFiles(e) {
+    var dt = e.dataTransfer;
+    return !!(dt && dt.types && Array.prototype.indexOf.call(dt.types, "Files") >= 0);
+  }
+  if (panelEl) {
+    panelEl.addEventListener("dragenter", function (e) { if (hasFiles(e)) { e.preventDefault(); dragN++; panelEl.classList.add("drag"); } });
+    panelEl.addEventListener("dragover", function (e) { if (hasFiles(e)) e.preventDefault(); });
+    panelEl.addEventListener("dragleave", function (e) {
+      if (!hasFiles(e)) return;
+      dragN = Math.max(0, dragN - 1);
+      if (!dragN) panelEl.classList.remove("drag");
+    });
+    panelEl.addEventListener("drop", function (e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragN = 0;
+      panelEl.classList.remove("drag");
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) sendFile(withName(f));
+    });
+  }
+
+  window.__dbChatState = { lastId: function () { return lastId; } };
 
   intro();
   if (token) nameEl.style.display = "none"; else ready = true;
