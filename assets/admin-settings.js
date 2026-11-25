@@ -102,6 +102,25 @@
     };
   }
 
+  var FX_TYPES = [
+    ["", "Yoxdur (söndürülü)"], ["snow", "❄️ Qar (Yeni il)"], ["bonfire", "🔥 Tonqal (Novruz)"],
+    ["fireworks", "🎆 Fişənglər (Yeni il / bayram)"], ["confetti", "🎉 Konfeti (bayram, ad günü)"],
+    ["hearts", "❤️ Ürəklər (Sevgi günü)"], ["petals", "🌸 Çiçək ləçəkləri (Yaz, 8 Mart)"]
+  ];
+  function fxBlock(s) {
+    var t = s.fx_type || "", lv = s.fx_level || "2";
+    var opts = FX_TYPES.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === t ? " selected" : "") + ">" + o[1] + "</option>"; }).join("");
+    var lvs = [["1", "Az"], ["2", "Orta"], ["3", "Çox"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === lv ? " selected" : "") + ">" + o[1] + "</option>"; }).join("");
+    var sel = "width:100%;" + INP + ";margin-bottom:8px";
+    return '<div class="card-box" style="margin-bottom:12px"><b>Bayram effekti</b>' +
+      '<p class="muted" style="font-size:12px;margin-top:4px">Seçdiyiniz effekt bütün saytda görünür. Düymələrə və yazılara mane olmur.</p>' +
+      '<label class="muted" style="font-size:12px">Effekt</label><select data-f="fx_type" style="' + sel + '">' + opts + "</select>" +
+      '<label class="muted" style="font-size:12px">Sıxlıq</label><select data-f="fx_level" style="' + sel + '">' + lvs + "</select>" +
+      '<label class="muted" style="font-size:12px">Başlama tarixi (boş qalsa dərhal başlayır)</label><input type="date" data-f="fx_from" value="' + esc(s.fx_from || "") + '" style="' + sel + '">' +
+      '<label class="muted" style="font-size:12px">Bitmə tarixi (boş qalsa özü dayanmır)</label><input type="date" data-f="fx_to" value="' + esc(s.fx_to || "") + '" style="' + sel + '">' +
+      '<p class="muted" style="font-size:11px">Tarix qoysanız effekt həmin günlərdə özü açılıb özü bağlanır. Məs: 25 dekabr – 5 yanvar.</p></div>';
+  }
+
   function bindColors() {
     list.querySelectorAll('input[type="color"][data-f]').forEach(function (inp) {
       inp.addEventListener("input", function () {
@@ -132,6 +151,7 @@
         "</div></div>";
     });
     html += colorBlock(s);
+    html += fxBlock(s);
     html += '<button class="btn gold" data-ssave="1" style="width:100%;margin-bottom:20px">Yadda saxla</button>';
     list.innerHTML = html;
     list.querySelector("[data-ssave]").onclick = save;
@@ -151,6 +171,7 @@
     var cs = list.querySelector('[data-f="chat_show"]');
     out.chat_show = (cs && !cs.checked) ? "0" : "1";
     out.chat_icon = chatIcon;
+    ["fx_type", "fx_level", "fx_from", "fx_to"].forEach(function (k) { out[k] = val(list, k); });
     return out;
   }
 
