@@ -10,6 +10,7 @@
   var lastId = 0;
 
   function stop() { if (timer) { clearInterval(timer); timer = null; } current = null; }
+  function rate(v) { return Number(v) === 1 ? " 👍" : (Number(v) === -1 ? " 👎" : ""); }
   function fmt(d) {
     try { return new Date(d).toLocaleString("az-AZ"); } catch (e) { return ""; }
   }
@@ -39,7 +40,7 @@
         ? '<span style="background:#d4af37;color:#000;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700">' + t.unread_admin + " yeni</span>" : "";
       return '<div class="card-box" data-open="' + esc(t.id) + '" style="margin-bottom:10px;cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' +
-        esc(t.visitor_name || "Qonaq") + "</b>" + unread + "</div>" +
+        esc(t.visitor_name || "Qonaq") + rate(t.rating) + "</b>" + unread + "</div>" +
         '<p style="margin:6px 0;color:#d4d4d4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(plain(t.last_body)) + "</p>" +
         '<span class="muted" style="font-size:12px">' + esc(fmt(t.last_message_at)) + "</span></div>";
     }).join("");
@@ -111,7 +112,7 @@
       '<button class="btn" id="adBack">← Siyahı</button>' +
       '<button class="btn" id="adToggle">' + (closed ? "Yenidən aç" : "Söhbəti bağla") + "</button>" +
       '<button class="btn" id="adDel" style="color:#f87171">Sil</button></div>' +
-      '<div class="card-box"><b>' + esc(th.visitor_name || "Qonaq") + "</b>" +
+      '<div class="card-box"><b>' + esc(th.visitor_name || "Qonaq") + rate(th.rating) + "</b>" +
       '<div id="adMsgs" style="height:44vh;min-height:240px;overflow-y:auto;margin-top:10px;padding-right:4px"></div>' +
       '<div style="display:flex;gap:8px;margin-top:10px">' +
       '<textarea id="adText" rows="2" maxlength="2000" placeholder="Cavabınızı yazın..." style="flex:1;' + INP + ';resize:none"></textarea>' +
@@ -148,6 +149,14 @@
       appendMessages([x.data.message]);
     }
     document.getElementById("adSend").onclick = sendReply;
+    // Operator yazarkən müştəriyə "yazır..." siqnalı (2.5 san-də bir dəfə)
+    var lastTyping = 0;
+    document.getElementById("adText").addEventListener("input", function () {
+      var n = Date.now();
+      if (n - lastTyping < 2500 || !this.value.trim()) return;
+      lastTyping = n;
+      api(PATH + "admin_typing", { method: "POST", body: { thread: id } });
+    });
 
     timer = setInterval(async function () {
       if (current !== id) return;
