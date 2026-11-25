@@ -74,7 +74,55 @@
   }catch(e){}
 
   // Çat düyməsi (admin paneldən): göstər/gizlət, rəng, kiçik şəkil ikon
-  function paintChatFab(o){
+  // İkonun ətrafındakı boş (şəffaf və ya tək rəngli) kənarlar avtomatik kəsilir ki, şəkil dairəni tam doldursun.
+  var trimCache = {}, fabSeq = 0;
+  function trimIcon(src, cb){
+    if(trimCache[src]){ cb(trimCache[src]); return; }
+    var im = new Image();
+    im.onload = function(){
+      var out = src;
+      try{
+        var W = im.width, H = im.height;
+        var tw = Math.min(W, 256), k = tw / W, th = Math.max(1, Math.round(H * k));
+        var c = document.createElement("canvas"); c.width = tw; c.height = th;
+        var cx = c.getContext("2d"); cx.drawImage(im, 0, 0, tw, th);
+        var d = cx.getImageData(0, 0, tw, th).data;
+        function px(i, j){ var o = (j * tw + i) * 4; return [d[o], d[o+1], d[o+2], d[o+3]]; }
+        var cs = [px(0,0), px(tw-1,0), px(0,th-1), px(tw-1,th-1)];
+        var clear = cs.every(function(p){ return p[3] < 20; });
+        var bg = null;
+        if(!clear && cs.every(function(p){ return p[3] > 235; })){
+          bg = [0,1,2].map(function(n){ return (cs[0][n] + cs[1][n] + cs[2][n] + cs[3][n]) / 4; });
+          if(cs.some(function(p){ return Math.abs(p[0]-bg[0]) + Math.abs(p[1]-bg[1]) + Math.abs(p[2]-bg[2]) > 60; })) bg = null;
+        }
+        if(clear || bg){
+          var x0 = tw, y0 = th, x1 = -1, y1 = -1;
+          for(var j = 0; j < th; j++){
+            for(var i = 0; i < tw; i++){
+              var o = (j * tw + i) * 4;
+              var on = d[o+3] > 20 && (clear || (Math.abs(d[o]-bg[0]) + Math.abs(d[o+1]-bg[1]) + Math.abs(d[o+2]-bg[2]) > 60));
+              if(on){ if(i < x0) x0 = i; if(i > x1) x1 = i; if(j < y0) y0 = j; if(j > y1) y1 = j; }
+            }
+          }
+          if(x1 >= x0 && y1 >= y0){
+            var side = Math.min(Math.max(x1 - x0 + 1, y1 - y0 + 1), tw, th);
+            var mx = (x0 + x1 + 1) / 2, my = (y0 + y1 + 1) / 2;
+            var sx = Math.max(0, Math.min(tw - side, mx - side / 2)), sy = Math.max(0, Math.min(th - side, my - side / 2));
+            if(side < Math.min(tw, th) * 0.95){
+              var oc = document.createElement("canvas"); oc.width = 128; oc.height = 128;
+              oc.getContext("2d").drawImage(im, sx / k, sy / k, side / k, side / k, 0, 0, 128, 128);
+              out = oc.toDataURL("image/png");
+            }
+          }
+        }
+      }catch(e){ out = src; }
+      trimCache[src] = out;
+      cb(out);
+    };
+    im.onerror = function(){ cb(src); };
+    im.src = src;
+  }
+  function paintChatFabNow(o){
     o = o || {};
     var old = document.getElementById("dbChatFabStyle");
     var css = "";
@@ -92,6 +140,18 @@
     if(!css){ if(old) old.remove(); return; }
     if(!old){ old = document.createElement("style"); old.id = "dbChatFabStyle"; document.head.appendChild(old); }
     old.textContent = css;
+  }
+  function paintChatFab(o){
+    o = o || {};
+    var seq = ++fabSeq;
+    var ico = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(o.icon || "") ? o.icon : "";
+    if(o.show === false || !ico){ paintChatFabNow(o); return; }
+    if(trimCache[ico]){ paintChatFabNow({ show: o.show, color: o.color, icon: trimCache[ico] }); return; }
+    paintChatFabNow({ show: o.show, color: o.color, icon: "" });
+    trimIcon(ico, function(t){
+      if(seq !== fabSeq) return;
+      paintChatFabNow({ show: o.show, color: o.color, icon: t });
+    });
   }
   function applyChatFab(set){
     set = set || {};
