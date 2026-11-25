@@ -60,7 +60,7 @@
       '<label class="btn" style="cursor:pointer">Şəkil seç<input type="file" accept="image/*" data-cifile style="display:none"></label>' +
       '<button type="button" class="btn ghost" data-cidel style="padding:8px 12px;font-size:13px">Şəkli sil</button>' +
       '<span class="muted" style="font-size:12px" data-cimsg></span></div>' +
-      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart çat ikonu görünür. Şəkil çat dairəsinin tam ölçüsündə görünür (kvadrat şəkil ən yaxşı nəticəni verir).</p></div></div>';
+      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart çat ikonu görünür. Şəkil çat dairəsinin tam ölçüsündə görünür (kənardakı boş yerlər avtomatik kəsilir).</p></div></div>';
   }
   function paintIconPreview() {
     var pv = list.querySelector("[data-ciprev]");
@@ -79,13 +79,37 @@
       rd.onload = function () {
         var im = new Image();
         im.onload = function () {
+          // Şəklin ətrafındakı şəffaf boş kənarları kəsir ki, ikon dairəni tam doldursun
+          var sx = 0, sy = 0, sw = im.width, sh = im.height;
+          try {
+            var tw = Math.min(im.width, 400), tsc = tw / im.width, th = Math.max(1, Math.round(im.height * tsc));
+            var tc = document.createElement("canvas");
+            tc.width = tw; tc.height = th;
+            var tx = tc.getContext("2d");
+            tx.drawImage(im, 0, 0, tw, th);
+            var d = tx.getImageData(0, 0, tw, th).data;
+            var x0 = tw, y0 = th, x1 = -1, y1 = -1;
+            for (var yy = 0; yy < th; yy++) {
+              for (var xx = 0; xx < tw; xx++) {
+                if (d[(yy * tw + xx) * 4 + 3] > 20) {
+                  if (xx < x0) x0 = xx; if (xx > x1) x1 = xx;
+                  if (yy < y0) y0 = yy; if (yy > y1) y1 = yy;
+                }
+              }
+            }
+            if (x1 >= x0 && y1 >= y0) {
+              var bw = x1 - x0 + 1, bh = y1 - y0 + 1, side = Math.max(bw, bh);
+              var cxm = x0 + bw / 2, cym = y0 + bh / 2;
+              sx = Math.max(0, (cxm - side / 2) / tsc); sy = Math.max(0, (cym - side / 2) / tsc);
+              sw = Math.min(im.width - sx, side / tsc); sh = Math.min(im.height - sy, side / tsc);
+            }
+          } catch (e) { sx = 0; sy = 0; sw = im.width; sh = im.height; }
           function make(size) {
             var cv = document.createElement("canvas");
             cv.width = size; cv.height = size;
             var cx = cv.getContext("2d");
-            var sc = Math.max(size / im.width, size / im.height); // cover: dairəni tam doldurur
-            var w = im.width * sc, h = im.height * sc;
-            cx.drawImage(im, (size - w) / 2, (size - h) / 2, w, h);
+            var sq = Math.min(sw, sh); // kvadrat kəsik: dairəni tam doldurur
+            cx.drawImage(im, sx + (sw - sq) / 2, sy + (sh - sq) / 2, sq, sq, 0, 0, size, size);
             return cv.toDataURL("image/png");
           }
           var out = make(128);
