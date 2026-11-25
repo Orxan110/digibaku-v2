@@ -16,12 +16,23 @@
   // Bot/operator mesajlarındakı kart və düymələr xam mətn kimi görünməsin
   function plain(s) { return window.ChatRender ? ChatRender.plain(s) : String(s || ""); }
 
+  // Müştərinin göndərdiyi fayl: şəkil önizləmə, digərləri yükləmə linki
+  function fileHtml(m) {
+    var url = "/api/chat?action=file&id=" + encodeURIComponent(m.file_id);
+    if (/^image\//.test(m.file_type || "")) {
+      return '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="" style="display:block;max-width:100%;max-height:240px;border-radius:10px"></a>';
+    }
+    var kb = m.file_size ? " · " + Math.max(1, Math.round(m.file_size / 1024)) + " KB" : "";
+    return '<a href="' + url + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📎 ' + esc(m.file_name || "fayl") + kb + "</a>";
+  }
+
   // ---------- Söhbətlərin siyahısı ----------
   function renderList(threads) {
     var tabs = '<div style="display:flex;gap:8px;margin-bottom:12px">' +
       [["open", "Açıq"], ["closed", "Bağlı"]].map(function (x) {
         return '<button class="btn' + (x[0] === FILTER ? " gold" : "") + '" data-f="' + x[0] + '">' + x[1] + "</button>";
-      }).join("") + "</div>";
+      }).join("") +
+      '<button class="btn" id="adDelAll" style="color:#f87171;margin-left:auto">Bütün yazışmaları sil</button></div>';
     var rows = threads.filter(function (t) { return t.status === FILTER; });
     var body = rows.map(function (t) {
       var unread = Number(t.unread_admin) > 0
@@ -39,6 +50,17 @@
     list.querySelectorAll("[data-open]").forEach(function (c) {
       c.onclick = function () { openThread(c.getAttribute("data-open")); };
     });
+    var delAll = document.getElementById("adDelAll");
+    if (delAll) delAll.onclick = async function () {
+      if (!confirm("DİQQƏT: BÜTÜN çat yazışmaları və müştərilərin göndərdiyi fayllar həmişəlik silinəcək. Davam edilsin?")) return;
+      var w = prompt("Təsdiq üçün SIL yazın:");
+      if (!w || w.trim().toUpperCase() !== "SIL") return;
+      var x = await api(PATH + "admin_delete_all", { method: "POST", body: { confirm: "SIL" } });
+      if (x.status === 401) { expired(); return; }
+      if (!x.ok) { showMsg(fetchErr(x, "Silinmədi.")); return; }
+      showMsg("");
+      loadThreads();
+    };
   }
 
   async function loadThreads() {
@@ -62,7 +84,7 @@
     return '<div style="display:flex;flex-direction:column;align-items:' + (mine ? "flex-end" : "flex-start") + ';margin-bottom:10px">' +
       '<div style="max-width:85%;padding:10px 14px;border-radius:16px;word-break:break-word;' + (rich ? "" : "white-space:pre-wrap;") +
       (mine ? "background:#d4af37;color:#000" : "background:#1a1a1a;color:#f5f5f5;border:1px solid #262626") + '">' +
-      (rich ? '<div class="cm-admin">' + ChatRender.html(m.body) + "</div>" : esc(m.body)) + "</div>" +
+      (m.file_id ? fileHtml(m) : rich ? '<div class="cm-admin">' + ChatRender.html(m.body) + "</div>" : esc(m.body)) + "</div>" +
       '<span class="muted" style="font-size:11px;margin-top:3px">' + esc(mine ? (m.is_bot ? "Bot (avto)" : "Siz") : "Müştəri") + " · " + esc(fmt(m.created_at)) + "</span></div>";
   }
 
