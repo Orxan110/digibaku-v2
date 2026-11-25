@@ -21,7 +21,14 @@
     "#dbChatPanel .chat-x:hover{border-color:var(--gold);color:var(--gold)}" +
     "#dbChatLauncher{position:fixed;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:55}" +
     "@media(min-width:900px){#dbChatLauncher{bottom:24px}}" +
-    "@media(max-width:899px){html.db-chat-open{overflow:hidden}}";
+    "@media(max-width:899px){html.db-chat-open{overflow:hidden}}" +
+    "#dbChatPanel .chat-attach{flex:0 0 44px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}" +
+    "#dbChatPanel .chat-attach svg{width:20px;height:20px}" +
+    "#dbChatPanel .chat-attach:hover{border-color:var(--gold);color:var(--gold)}" +
+    "#dbChatPanel .chat-attach:disabled{opacity:.5;cursor:not-allowed}" +
+    ".cm-file{display:flex;align-items:center;gap:8px;color:inherit;text-decoration:none!important}" +
+    ".cm-file-t{word-break:break-all;text-decoration:underline}" +
+    ".cm-file.img img{display:block;max-width:220px;max-height:220px;width:auto;height:auto;border-radius:10px}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
@@ -45,6 +52,10 @@
       '<div class="chat-foot">' +
         '<input id="chatName" class="chat-name" maxlength="60" autocomplete="name">' +
         '<div class="chat-row">' +
+          '<input type="file" id="chatFile" hidden accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.txt,.docx,.xlsx,image/*">' +
+          '<button id="chatAttach" class="chat-attach" type="button">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>' +
+          '</button>' +
           '<textarea id="chatText" rows="1" maxlength="1000"></textarea>' +
           '<button id="chatSend" class="chat-send" type="button">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2z"/></svg>' +
@@ -55,7 +66,7 @@
     '</div>';
   document.body.appendChild(panel);
 
-  // Səhifədə çat düyməsi yoxdursa öz düyməsini əlavə edir
+  // Səhifədə çat düyməsi yoxdursa (məs. #fabs olmayan səhifə) öz düyməsini əlavə edir
   function ensureLauncher() {
     if (document.querySelector(".fab.chat") || document.getElementById("dbChatLauncher")) return;
     var b = document.createElement("a");
