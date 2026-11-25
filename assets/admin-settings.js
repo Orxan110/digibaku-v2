@@ -27,54 +27,85 @@
   }
 
   var COLOR_DEF = "#d4af37";
-  var COLOR_DEFS = { color_gold: "#d4af37", color_sale: "#d4af37", color_chat: "#3b63e0" };
-  var chatIcon = "";
+  var COLOR_DEFS = { color_gold: "#d4af37", color_sale: "#d4af37", color_chat: "#3b63e0", color_wa: "#66cc77", color_bg: "#000000", color_card: "#111111" };
+  var HINTS = { color_gold: "Standart (sarı)", color_sale: "Əsas rənglə eyni", color_chat: "Standart (mavi)", color_wa: "Standart (yaşıl)", color_bg: "Standart (qara)", color_card: "Standart (fona uyğun)" };
+  var icons = { chat: "", wa: "" };
+
+  function colorRow(key, label, v, empty) {
+    return '<div style="margin-top:10px"><label class="muted" style="font-size:12px">' + esc(label) + '</label>' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">' +
+      '<input type="color" data-f="' + key + '" value="' + esc(v) + '"' + (empty ? ' data-empty="1"' : "") +
+      ' style="width:56px;height:40px;padding:2px;border:1px solid #262626;border-radius:10px;background:#1a1a1a;cursor:pointer">' +
+      '<span class="muted" style="font-size:12px;flex:1" data-hint="' + key + '">' + esc(empty ? HINTS[key] : v) + "</span>" +
+      '<button type="button" class="btn ghost" data-creset="' + key + '" style="padding:8px 12px;font-size:13px">Sıfırla</button>' +
+      "</div></div>";
+  }
+  function iconBlock(kind, label) {
+    return '<div style="margin-top:12px"><label class="muted" style="font-size:12px">' + esc(label) + '</label>' +
+      '<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap">' +
+      '<span data-iprev="' + kind + '" style="width:44px;height:44px;border-radius:50%;border:1px solid #262626;background:#1a1a1a center/cover no-repeat;flex:0 0 auto"></span>' +
+      '<label class="btn" style="cursor:pointer">Şəkil seç<input type="file" accept="image/*" data-ifile="' + kind + '" style="display:none"></label>' +
+      '<button type="button" class="btn ghost" data-idel="' + kind + '" style="padding:8px 12px;font-size:13px">Şəkli sil</button>' +
+      '<span class="muted" style="font-size:12px" data-imsg="' + kind + '"></span></div>' +
+      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart ikon görünür. Şəkil düymənin tam ölçüsündə görünür (kənardakı boş yerlər avtomatik kəsilir).</p></div>';
+  }
   function colorBlock(s) {
     var g = s.color_gold || "", sl = s.color_sale || "";
-    function row(key, label, v, empty, hint) {
-      return '<div style="margin-top:10px"><label class="muted" style="font-size:12px">' + esc(label) + '</label>' +
-        '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">' +
-        '<input type="color" data-f="' + key + '" value="' + esc(v) + '"' + (empty ? ' data-empty="1"' : "") +
-        ' style="width:56px;height:40px;padding:2px;border:1px solid #262626;border-radius:10px;background:#1a1a1a;cursor:pointer">' +
-        '<span class="muted" style="font-size:12px;flex:1" data-hint="' + key + '">' + esc(empty ? hint : v) + "</span>" +
-        '<button type="button" class="btn ghost" data-creset="' + key + '" style="padding:8px 12px;font-size:13px">Sıfırla</button>' +
-        "</div></div>";
-    }
     return '<div class="card-box" style="margin-bottom:12px"><b>Saytın rəngləri</b>' +
       '<p class="muted" style="font-size:12px;margin-top:4px">Seçdiyiniz rəng bütün saytda avtomatik dəyişir (düymələr, qiymətlər, vurğular, footer və s.).</p>' +
-      row("color_gold", "Əsas rəng (sarı yerlər)", g || COLOR_DEF, !g, "Standart (sarı)") +
-      row("color_sale", "Endirim yazısının rəngi", sl || g || COLOR_DEF, !sl, "Əsas rənglə eyni") +
-      "</div>" + chatBlock(s, row);
+      colorRow("color_gold", "Əsas rəng (sarı yerlər)", g || COLOR_DEF, !g) +
+      colorRow("color_sale", "Endirim yazısının rəngi", sl || g || COLOR_DEF, !sl) +
+      "</div>" + bgBlock(s) + chatBlock(s) + waBlock(s);
   }
-  function chatBlock(s, row) {
-    chatIcon = s.chat_icon || "";
+  function bgBlock(s) {
+    var bg = s.color_bg || "", cd = s.color_card || "";
+    var pre = [["Qara", "#000000"], ["Tünd mavi", "#0b1220"], ["Tünd boz", "#1c1c1e"], ["Ağ", "#f5f5f5"]].map(function (p) {
+      return '<button type="button" class="btn" data-bgpre="' + p[1] + '" style="padding:8px 12px;font-size:13px">' + esc(p[0]) + "</button>";
+    }).join("");
+    return '<div class="card-box" style="margin-bottom:12px"><b>Saytın fonu və kartlar</b>' +
+      '<p class="muted" style="font-size:12px;margin-top:4px">Fon rəngini seçdikdən sonra yazılar avtomatik uyğunlaşır (açıq fonda tünd yazı, tünd fonda açıq yazı). Kart rəngi boş qalsa fona uyğun özü seçilir.</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' + pre + "</div>" +
+      colorRow("color_bg", "Saytın fon rəngi", bg || COLOR_DEFS.color_bg, !bg) +
+      colorRow("color_card", "Kartların rəngi (məhsul kartları, qutular)", cd || COLOR_DEFS.color_card, !cd) +
+      '<button type="button" class="btn ghost" data-greset="bg" style="margin-top:12px;width:100%">Fonu ilkin hala qaytar (qara)</button></div>';
+  }
+  function chatBlock(s) {
+    icons.chat = s.chat_icon || "";
     var on = s.chat_show !== "0";
     var c = s.color_chat || "";
     return '<div class="card-box" style="margin-bottom:12px"><b>Çat düyməsi</b>' +
       '<p class="muted" style="font-size:12px;margin-top:4px">Saytın aşağı küncündəki çat düyməsi.</p>' +
       '<label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-size:14px"><input type="checkbox" data-f="chat_show"' + (on ? " checked" : "") + ' style="width:20px;height:20px"> Çat düyməsi saytda göstərilsin</label>' +
-      row("color_chat", "Çat düyməsinin rəngi", c || COLOR_DEFS.color_chat, !c, "Standart (mavi)") +
-      '<div style="margin-top:12px"><label class="muted" style="font-size:12px">Kiçik şəkil / ikon (telefondan yüklə)</label>' +
-      '<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap">' +
-      '<span data-ciprev style="width:44px;height:44px;border-radius:50%;border:1px solid #262626;background:#1a1a1a center/cover no-repeat;flex:0 0 auto"></span>' +
-      '<label class="btn" style="cursor:pointer">Şəkil seç<input type="file" accept="image/*" data-cifile style="display:none"></label>' +
-      '<button type="button" class="btn ghost" data-cidel style="padding:8px 12px;font-size:13px">Şəkli sil</button>' +
-      '<span class="muted" style="font-size:12px" data-cimsg></span></div>' +
-      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart çat ikonu görünür. Şəkil çat dairəsinin tam ölçüsündə görünür (kənardakı boş yerlər avtomatik kəsilir).</p></div></div>';
+      colorRow("color_chat", "Çat düyməsinin rəngi", c || COLOR_DEFS.color_chat, !c) +
+      iconBlock("chat", "Şəkil / ikon (telefondan yüklə)") + "</div>";
   }
-  function paintIconPreview() {
-    var pv = list.querySelector("[data-ciprev]");
-    if (pv) pv.style.backgroundImage = chatIcon ? "url(" + chatIcon + ")" : "none";
+  function waBlock(s) {
+    icons.wa = s.wa_icon || "";
+    var c = s.color_wa || "";
+    return '<div class="card-box" style="margin-bottom:12px"><b>WhatsApp düyməsi</b>' +
+      '<p class="muted" style="font-size:12px;margin-top:4px">Saytın aşağı küncündəki WhatsApp düyməsi.</p>' +
+      colorRow("color_wa", "WhatsApp düyməsinin rəngi", c || COLOR_DEFS.color_wa, !c) +
+      iconBlock("wa", "Şəkil / ikon (telefondan yüklə)") +
+      '<button type="button" class="btn ghost" data-greset="wa" style="margin-top:12px;width:100%">WhatsApp düyməsini ilkin hala qaytar (rəng + şəkil)</button></div>';
   }
-  function bindChatIcon() {
-    paintIconPreview();
-    var f = list.querySelector("[data-cifile]"), del = list.querySelector("[data-cidel]"), msg = list.querySelector("[data-cimsg]");
-    if (del) del.onclick = function () { chatIcon = ""; paintIconPreview(); msg.textContent = "Şəkil silinəcək (Yadda saxla düyməsinə bas)."; };
+
+  function paintIconPreview(kind) {
+    var pv = list.querySelector('[data-iprev="' + kind + '"]');
+    if (pv) pv.style.backgroundImage = icons[kind] ? "url(" + icons[kind] + ")" : "none";
+  }
+  function iconMsg(kind, t) {
+    var m = list.querySelector('[data-imsg="' + kind + '"]');
+    if (m) m.textContent = t;
+  }
+  function bindIcon(kind) {
+    paintIconPreview(kind);
+    var f = list.querySelector('[data-ifile="' + kind + '"]'), del = list.querySelector('[data-idel="' + kind + '"]');
+    if (del) del.onclick = function () { icons[kind] = ""; paintIconPreview(kind); iconMsg(kind, "Şəkil silinəcək (Yadda saxla düyməsinə bas)."); };
     if (!f) return;
     f.onchange = function () {
       var file = f.files && f.files[0];
       if (!file) return;
-      if (!/^image\//.test(file.type)) { msg.textContent = "Yalnız şəkil faylı seçin."; return; }
+      if (!/^image\//.test(file.type)) { iconMsg(kind, "Yalnız şəkil faylı seçin."); return; }
       var rd = new FileReader();
       rd.onload = function () {
         var im = new Image();
@@ -115,11 +146,11 @@
           var out = make(128);
           if (out.length > 85000) out = make(96);
           if (out.length > 85000) out = make(64);
-          if (out.length > 85000) { msg.textContent = "Şəkil çox mürəkkəbdir, daha sadə şəkil seçin."; return; }
-          chatIcon = out; paintIconPreview();
-          msg.textContent = "Şəkil hazırdır (Yadda saxla düyməsinə bas).";
+          if (out.length > 85000) { iconMsg(kind, "Şəkil çox mürəkkəbdir, daha sadə şəkil seçin."); return; }
+          icons[kind] = out; paintIconPreview(kind);
+          iconMsg(kind, "Şəkil hazırdır (Yadda saxla düyməsinə bas).");
         };
-        im.onerror = function () { msg.textContent = "Şəkil oxunmadı."; };
+        im.onerror = function () { iconMsg(kind, "Şəkil oxunmadı."); };
         im.src = rd.result;
       };
       rd.readAsDataURL(file);
@@ -146,6 +177,14 @@
       '<p class="muted" style="font-size:11px">Tarix qoysanız effekt həmin günlərdə özü açılıb özü bağlanır. Məs: 25 dekabr – 5 yanvar.</p></div>';
   }
 
+  function resetColor(k) {
+    var inp = list.querySelector('[data-f="' + k + '"]');
+    if (!inp) return;
+    inp.setAttribute("data-empty", "1");
+    inp.value = COLOR_DEFS[k] || COLOR_DEF;
+    var h = list.querySelector('[data-hint="' + k + '"]');
+    if (h) h.textContent = HINTS[k] || "";
+  }
   function bindColors() {
     list.querySelectorAll('input[type="color"][data-f]').forEach(function (inp) {
       inp.addEventListener("input", function () {
@@ -155,13 +194,27 @@
       });
     });
     list.querySelectorAll("[data-creset]").forEach(function (b) {
+      b.onclick = function () { resetColor(b.getAttribute("data-creset")); };
+    });
+    list.querySelectorAll("[data-bgpre]").forEach(function (b) {
       b.onclick = function () {
-        var k = b.getAttribute("data-creset");
-        var inp = list.querySelector('[data-f="' + k + '"]');
-        inp.setAttribute("data-empty", "1");
-        inp.value = COLOR_DEFS[k] || COLOR_DEF;
-        var h = list.querySelector('[data-hint="' + k + '"]');
-        if (h) h.textContent = k === "color_gold" ? "Standart (sarı)" : (k === "color_chat" ? "Standart (mavi)" : "Əsas rənglə eyni");
+        var inp = list.querySelector('[data-f="color_bg"]');
+        inp.value = b.getAttribute("data-bgpre");
+        inp.removeAttribute("data-empty");
+        var h = list.querySelector('[data-hint="color_bg"]');
+        if (h) h.textContent = inp.value;
+        resetColor("color_card");
+      };
+    });
+    list.querySelectorAll("[data-greset]").forEach(function (b) {
+      b.onclick = function () {
+        if (b.getAttribute("data-greset") === "bg") {
+          resetColor("color_bg"); resetColor("color_card");
+        } else {
+          resetColor("color_wa");
+          icons.wa = ""; paintIconPreview("wa");
+          iconMsg("wa", "İlkin hala qaytarıldı (Yadda saxla düyməsinə bas).");
+        }
       };
     });
   }
@@ -181,7 +234,8 @@
     list.innerHTML = html;
     list.querySelector("[data-ssave]").onclick = save;
     bindColors();
-    bindChatIcon();
+    bindIcon("chat");
+    bindIcon("wa");
   }
 
   function collect() {
@@ -189,13 +243,14 @@
     GROUPS.forEach(function (g) {
       g.fields.forEach(function (f) { out[f[0]] = val(list, f[0]); });
     });
-    ["color_gold", "color_sale", "color_chat"].forEach(function (k) {
+    ["color_gold", "color_sale", "color_chat", "color_wa", "color_bg", "color_card"].forEach(function (k) {
       var el = list.querySelector('[data-f="' + k + '"]');
       out[k] = (!el || el.getAttribute("data-empty")) ? "" : el.value;
     });
     var cs = list.querySelector('[data-f="chat_show"]');
     out.chat_show = (cs && !cs.checked) ? "0" : "1";
-    out.chat_icon = chatIcon;
+    out.chat_icon = icons.chat;
+    out.wa_icon = icons.wa;
     ["fx_type", "fx_level", "fx_from", "fx_to"].forEach(function (k) { out[k] = val(list, k); });
     return out;
   }
@@ -204,11 +259,12 @@
     var btn = list.querySelector("[data-ssave]");
     btn.disabled = true;
     showMsg("");
-    var r = await api(PATH + "save", { method: "POST", body: collect() });
+    var data = collect();
+    var r = await api(PATH + "save", { method: "POST", body: data });
     btn.disabled = false;
     if (r.status === 401) { expired(); return; }
     if (!r.ok) { showMsg(fetchErr(r, "Parametrlər yadda saxlanmadı.")); return; }
-    if (window.AdminTheme) window.AdminTheme.fromSettings({ color_gold: collect().color_gold, color_sale: collect().color_sale });
+    if (window.AdminTheme) window.AdminTheme.fromSettings({ color_gold: data.color_gold, color_sale: data.color_sale, color_bg: data.color_bg, color_card: data.color_card });
     showMsg("Yadda saxlandı. Saytda dəyişiklik bir neçə saniyə ərzində görünəcək.");
   }
 
