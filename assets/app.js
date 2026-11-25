@@ -104,6 +104,37 @@
     if(cf) paintChatFab(cf);
   }catch(e){}
 
+  // Bayram effektləri (admin paneldən): assets/effects.js yalnız effekt aktiv olanda yüklənir
+  var fxWant = null, fxLoading = false;
+  function fxActive(set){
+    var t = set.fx_type || "";
+    if(!/^(snow|bonfire|confetti|hearts|fireworks|petals)$/.test(t)) return "";
+    var d = new Date(), today = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    if(set.fx_from && today < set.fx_from) return "";
+    if(set.fx_to && today > set.fx_to) return "";
+    return t;
+  }
+  function runFx(type, level){
+    fxWant = { t: type, l: level };
+    if(window.DBFx){ window.DBFx.set(type, level); return; }
+    if(!type || fxLoading) return;
+    fxLoading = true;
+    var s = document.createElement("script");
+    s.src = "/assets/effects.js";
+    s.onload = function(){ fxLoading = false; if(window.DBFx && fxWant) window.DBFx.set(fxWant.t, fxWant.l); };
+    s.onerror = function(){ fxLoading = false; };
+    document.body.appendChild(s);
+  }
+  function applyFx(set){
+    set = set || {};
+    try{ localStorage.setItem("digibaku_fx", JSON.stringify({ fx_type: set.fx_type || "", fx_level: set.fx_level || "2", fx_from: set.fx_from || "", fx_to: set.fx_to || "" })); }catch(e){}
+    runFx(fxActive(set), parseInt(set.fx_level, 10) || 2);
+  }
+  try{
+    var fxc = JSON.parse(localStorage.getItem("digibaku_fx") || "null");
+    if(fxc && fxActive(fxc)) runFx(fxActive(fxc), parseInt(fxc.fx_level, 10) || 2);
+  }catch(e){}
+
   var T = {
     az:{home:"Ana səhifə",products:"Məhsullar",cart:"Səbət",orders:"Sifarişlər",profile:"Profilim",
         login:"Daxil ol",register:"Qeydiyyat",search:"Məhsul axtar...",faq:"FAQ",contact:"Əlaqə",
@@ -355,7 +386,7 @@
     fetch("/api/settings")
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d && d.settings){ DB.settings = d.settings; applySettings(); applyTheme(d.settings); applyChatFab(d.settings); }
+        if(d && d.settings){ DB.settings = d.settings; applySettings(); applyTheme(d.settings); applyChatFab(d.settings); applyFx(d.settings); }
         if(d && d.seo){ applySeo(d.seo); }
       })
       .catch(function(){});
