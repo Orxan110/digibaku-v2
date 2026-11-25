@@ -64,6 +64,9 @@ async function ensureFiles() {
     await pool.query("alter table chat_messages add column if not exists file_name text");
     await pool.query("alter table chat_messages add column if not exists file_type text");
     await pool.query("alter table chat_messages add column if not exists file_size integer");
+    await pool.query("alter table chat_threads add column if not exists admin_typing_at timestamptz");
+    await pool.query("alter table chat_threads add column if not exists rating smallint");
+    await pool.query("alter table chat_threads add column if not exists rated_at timestamptz");
   })().catch(function (e) { globalThis.chatFilesReady = null; throw e; });
   return globalThis.chatFilesReady;
 }
@@ -232,6 +235,18 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, token: token, message: m.rows[0], bot: bot });
     }
 
+    // Ziyarətçi xidməti qiymətləndirir (1 = yaxşı, -1 = pis)
+    if (req.method === "POST" && action === "rate") {
+      const b = body(req);
+      const token = txt(b.token, 100);
+      const v = Number(b.value) === 1 ? 1 : (Number(b.value) === -1 ? -1 : 0);
+      if (!token || !v) return res.status(400).json({ ok: false, error: "Qiymət yanlışdır." });
+      const r = await pool.query(
+        "update chat_threads set rating = $2, rated_at = now() where visitor_token = $1 returning id", [token, v]);
+      if (!r.rowCount) return res.status(404).json({ ok: false, error: "Söhbət tapılmadı." });
+      return res.status(200).json({ ok: true });
+    }
+
     // Faylı göstərmək/yükləmək (id təxmin edilə bilməyən UUID-dir)
     if (req.method === "GET" && action === "file") {
       const id = String(q.id || "");
@@ -255,7 +270,10 @@ async function handler(req, res) {
       const token = txt(q.token, 100);
       const after = parseInt(q.after, 10) || 0;
       if (!token) return res.status(200).json({ ok: true, messages: [], notfound: true });
-      const t = await pool.query("select id, status from chat_threads where visitor_token = $1", [token]);
+      const t = await pool.query(
+        `select id, status, rating,
+                (admin_typing_at is not null and admin_typing_at > now() - interval '6 seconds') as typing
+         from chat_threads where visitor_token = $1`, [token]);
       if (!t.rowCount) return res.status(200).json({ ok: true, messages: [], notfound: true });
       const hasBot = await ensureBot();
       const r = await pool.query(
@@ -263,7 +281,7 @@ async function handler(req, res) {
          from chat_messages
          where thread_id = $1 and id > $2 order by id limit 200`,
         [t.rows[0].id, after]);
-      return res.status(200).json({ ok: true, messages: r.rows, status: t.rows[0].status });
+      return res.status(200).json({ ok: true, messages: r.rows, status: t.rows[0].status, rating: t.rows[0].rating, typing: !!t.rows[0].typing });
     }
 
     // ================= ADMİN =================
@@ -273,7 +291,7 @@ async function handler(req, res) {
 
     if (req.method === "GET" && action === "admin_threads") {
       const r = await pool.query(
-        `select t.id, t.visitor_name, t.status, t.unread_admin, t.last_message_at,
+        `select t.id, t.visitor_name, t.status, t.unread_admin, t.last_message_at, t.rating,
                 (select body from chat_messages m where m.thread_id = t.id order by m.id desc limit 1) as last_body
          from chat_threads t
          order by t.last_message_at desc limit 200`);
@@ -285,7 +303,7 @@ async function handler(req, res) {
       const id = String(q.thread || "");
       if (!UUID_RE.test(id)) return res.status(400).json({ ok: false, error: "Söhbət yanlışdır." });
       const after = parseInt(q.after, 10) || 0;
-      const t = await pool.query("select id, visitor_name, status from chat_threads where id = $1", [id]);
+      const t = await pool.query("select id, visitor_name, status, rating from chat_threads where id = $1", [id]);
       if (!t.rowCount) return res.status(404).json({ ok: false, error: "Söhbət tapılmadı." });
       const r = await pool.query(
         `select id::int as id, sender, body, created_at, coalesce(is_bot, false) as is_bot, ${FILE_COLS} from chat_messages
@@ -307,8 +325,17 @@ async function handler(req, res) {
         `insert into chat_messages (thread_id, sender, body) values ($1, 'admin', $2)
          returning id::int as id, sender, body, created_at`,
         [id, text]);
-      await pool.query("update chat_threads set last_message_at = now(), unread_admin = 0 where id = $1", [id]);
+      await pool.query("update chat_threads set last_message_at = now(), unread_admin = 0, admin_typing_at = null where id = $1", [id]);
       return res.status(200).json({ ok: true, message: m.rows[0] });
+    }
+
+    // Operator yazarkən ziyarətçidə "yazır..." göstərilir
+    if (req.method === "POST" && action === "admin_typing") {
+      const b = body(req);
+      const id = String(b.thread || "");
+      if (!UUID_RE.test(id)) return res.status(400).json({ ok: false, error: "Söhbət yanlışdır." });
+      await pool.query("update chat_threads set admin_typing_at = now() where id = $1", [id]);
+      return res.status(200).json({ ok: true });
     }
 
     if (req.method === "POST" && action === "admin_status") {
