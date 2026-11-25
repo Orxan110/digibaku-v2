@@ -243,9 +243,104 @@
     timer = setInterval(async function () {
       if (current !== id) return;
       var x = await api(PATH + "admin_messages&thread=" + encodeURIComponent(id) + "&after=" + lastId);
-      if (x.ok) appendMessages(x.data.messages || []);
+      if (x.ok) {
+        var inc = (x.data.messages || []).some(function (m) { return m.sender === "visitor"; });
+        appendMessages(x.data.messages || []);
+        if (inc) nBeep();
+      }
     }, 5000);
   }
+
+  // ---------- Yeni çat bildirişi (hansı bölmədə olursunuz olun) ----------
+  // Müştəri yazanda: səs, «Çat» düyməsində qırmızı say, başlıq yanıb-sönür, (icazə verilibsə) brauzer bildirişi
+  var ADMIN_KEY = "digibaku_admin";
+  var nBadge = null, lastUnread = null, chatN = 0, flashT = null, flashOn = false, actx = null;
+
+  function nUnlock() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return;
+      if (!actx) actx = new C();
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) {}
+  }
+  function nBeep() {
+    try {
+      nUnlock();
+      if (!actx) return;
+      var now = actx.currentTime;
+      [[880, 0], [1175, 0.14], [880, 0.5], [1175, 0.64]].forEach(function (n) {
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.type = "sine";
+        o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, now + n[1]);
+        g.gain.exponentialRampToValueAtTime(0.22, now + n[1] + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + n[1] + 0.3);
+        o.connect(g); g.connect(actx.destination);
+        o.start(now + n[1]); o.stop(now + n[1] + 0.35);
+      });
+    } catch (e) {}
+  }
+  document.addEventListener("click", function () {
+    nUnlock();
+    try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+  }, { once: true });
+
+  function chatBadge() {
+    if (nBadge && document.body.contains(nBadge)) return nBadge;
+    var btn = document.querySelector('#nav [data-sec="chat"]');
+    if (!btn) return null;
+    nBadge = document.createElement("span");
+    nBadge.style.cssText = "float:right;background:#ef4444;color:#fff;border-radius:999px;font-size:12px;font-weight:700;padding:1px 8px;display:none";
+    btn.appendChild(nBadge);
+    return nBadge;
+  }
+  function chatTitle() {
+    if (chatN > 0) {
+      if (flashT) return;
+      flashT = setInterval(function () {
+        flashOn = !flashOn;
+        document.title = flashOn ? "💬 (" + chatN + ") Yeni çat mesajı" : "Admin";
+      }, 1200);
+    } else if (flashT) {
+      clearInterval(flashT);
+      flashT = null;
+      flashOn = false;
+      document.title = "Admin";
+    }
+  }
+  async function chatPoll() {
+    var tk = "";
+    try { tk = localStorage.getItem(ADMIN_KEY) || ""; } catch (e) {}
+    if (!tk) return;
+    var r;
+    try { r = await api(PATH + "admin_threads"); } catch (e) { return; }
+    if (!r || !r.ok) return;
+    var n = 0, names = [];
+    (r.data.threads || []).forEach(function (t) {
+      // açıq olan söhbət istisna: onu artıq görürsünüz
+      if (t.status === "open" && Number(t.unread_admin) > 0 && t.id !== current) {
+        n += Number(t.unread_admin);
+        names.push(t.visitor_name || "Qonaq");
+      }
+    });
+    chatN = n;
+    var b = chatBadge();
+    if (b) { b.textContent = n > 9 ? "9+" : n; b.style.display = n ? "" : "none"; }
+    chatTitle();
+    if (lastUnread !== null && n > lastUnread) {
+      nBeep();
+      showMsg("💬 Yeni çat mesajı gəldi! «Çat» bölməsinə baxın.");
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("DigiBaku çat", { body: names.slice(0, 3).join(", ") + ": yeni mesaj" });
+        }
+      } catch (e) {}
+    }
+    lastUnread = n;
+  }
+  setInterval(chatPoll, 10000);
+  setTimeout(chatPoll, 3000);
 
   AD.loadChat = loadThreads;
 
