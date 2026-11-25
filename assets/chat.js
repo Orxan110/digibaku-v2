@@ -45,6 +45,7 @@
   try { token = localStorage.getItem(KEY) || ""; } catch (e) {}
   var lastId = 0, seen = {}, lastDay = "", sending = false, typingEl = null;
   var timer = null, lastActivity = Date.now();
+  var ready = false;   // ilk yükləmədən sonra gələn yeni mesajlarda səs çalınır
 
   function fmtTime(d) {
     try { return new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; }
@@ -209,7 +210,7 @@
   }
 
   function addMessages(list) {
-    var added = false;
+    var added = false, incoming = false;
     list.forEach(function (m) {
       if (!m || seen[m.id]) return;
       seen[m.id] = true;
@@ -217,8 +218,10 @@
       addDay(m.created_at);
       box.appendChild(bubble(m, false));
       added = true;
+      if (m.sender !== "visitor") incoming = true;
     });
     if (added) scrollDown();
+    if (added && incoming && ready && window.__dbChatSound) window.__dbChatSound.play();
     return added;
   }
 
@@ -247,7 +250,7 @@
 
   function reset() {
     try { localStorage.removeItem(KEY); } catch (e) {}
-    token = ""; lastId = 0; seen = {}; lastDay = "";
+    token = ""; lastId = 0; seen = {}; lastDay = ""; ready = true;
     box.innerHTML = "";
     intro();
     nameEl.style.display = "";
@@ -262,6 +265,7 @@
       if (sending) return;
       if (d.notfound) { reset(); return; }
       if (d.messages && addMessages(d.messages)) lastActivity = Date.now();
+      ready = true;
     } catch (e) {}
   }
 
@@ -370,7 +374,7 @@
   })(0);
 
   intro();
-  if (token) nameEl.style.display = "none";
+  if (token) nameEl.style.display = "none"; else ready = true;
   poll();
   schedule();
 })();
