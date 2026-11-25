@@ -30,17 +30,20 @@
   })();
 
 
-  // Rəng mövzusu (admin paneldən): əsas rəng (--gold) və endirim rəngi (--sale).
+  // Rəng mövzusu (admin paneldən): əsas rəng (--gold), endirim rəngi (--sale), sayt fonu (--bg) və kart rəngi (--card).
   // Son seçim yadda saxlanılır ki, səhifə açılanda köhnə rəng "yanıb-sönməsin".
   var HEX = /^#[0-9a-fA-F]{6}$/;
   function hexRgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
   function rgbHex(a){ return "#" + a.map(function(n){ n = Math.max(0, Math.min(255, Math.round(n))); return (n < 16 ? "0" : "") + n.toString(16); }).join(""); }
-  function onColor(h){ var c = hexRgb(h); return (c[0]*0.299 + c[1]*0.587 + c[2]*0.114) > 150 ? "#000" : "#fff"; }
-  function paintTheme(g, sl){
+  function lum(h){ var c = hexRgb(h); return c[0]*0.299 + c[1]*0.587 + c[2]*0.114; }
+  function onColor(h){ return lum(h) > 150 ? "#000" : "#fff"; }
+  function mixHex(a, b, t){ var x = hexRgb(a), y = hexRgb(b); return rgbHex([x[0]+(y[0]-x[0])*t, x[1]+(y[1]-x[1])*t, x[2]+(y[2]-x[2])*t]); }
+  var THEME_VARS = ["--gold","--gold-d","--gold-rgb","--sale","--on-gold","--on-sale","--bg","--bg-rgb","--card","--card2","--line","--text","--muted"];
+  function paintTheme(g, sl, bg, cd){
     var st = document.documentElement.style;
-    ["--gold","--gold-d","--gold-rgb","--sale","--on-gold","--on-sale"].forEach(function(k){ st.removeProperty(k); });
+    THEME_VARS.forEach(function(k){ st.removeProperty(k); });
     var old = document.getElementById("dbThemeStyle");
-    if(!g && !sl){ if(old) old.remove(); return; }
+    if(!g && !sl && !bg && !cd){ if(old) old.remove(); return; }
     var c = hexRgb(g || "#d4af37");
     if(g){
       st.setProperty("--gold", g);
@@ -49,9 +52,8 @@
     st.setProperty("--gold-rgb", c.join(","));
     st.setProperty("--on-gold", g ? onColor(g) : "#000");
     if(sl) st.setProperty("--sale", sl);
-    st.setProperty("--on-sale", onColor(sl || g));
-    if(!old){ old = document.createElement("style"); old.id = "dbThemeStyle"; document.head.appendChild(old); }
-    old.textContent =
+    st.setProperty("--on-sale", onColor(sl || g || "#d4af37"));
+    var css =
       ".btn.gold,.badge,.chat-av,.cm-row.me .cm-b,.chat-send,.chip.on,.ptabs-nav button.on,.pt-rich ol.pt-steps li::before,.dbf-btn.fill,.dbf-brand .mk{color:var(--on-gold)!important}" +
       ".pbadge,.sale{background:var(--sale,var(--gold))!important;color:var(--on-sale)!important}" +
       ".stars,.starpick button.on,[style*=\"color:#d4af37\"]{color:var(--gold)!important}" +
@@ -60,22 +62,54 @@
       "footer.dbf .dbf-cta{border-color:rgba(var(--gold-rgb),.35)!important;background:linear-gradient(135deg,rgba(var(--gold-rgb),.1),#0c0c0c 70%)!important}" +
       "footer.dbf .dbf-btn.line:hover,.btn-out:hover{background:rgba(var(--gold-rgb),.12)!important}" +
       "#dbChatPanel .chat-hours{background:rgba(var(--gold-rgb),.12)!important}";
+    // Sayt fonu və kartlar: yazı rəngi fona görə avtomatik seçilir
+    if(bg || cd){
+      var b0 = bg || "#000000";
+      var light = lum(b0) > 150;
+      var cardc = cd || (light ? mixHex(b0, "#ffffff", 0.65) : mixHex(b0, "#ffffff", 0.07));
+      var textc = light ? "#111111" : "#f5f5f5";
+      st.setProperty("--bg", b0);
+      st.setProperty("--bg-rgb", hexRgb(b0).join(","));
+      st.setProperty("--card", cardc);
+      st.setProperty("--card2", mixHex(cardc, light ? "#000000" : "#ffffff", 0.06));
+      st.setProperty("--line", mixHex(b0, textc, 0.17));
+      st.setProperty("--text", textc);
+      st.setProperty("--muted", light ? "#5f5f5f" : "#a3a3a3");
+      css +=
+        "header.top{background:rgba(var(--bg-rgb),.92)!important}" +
+        ".bottom-nav{background:rgba(var(--bg-rgb),.96)!important}" +
+        ".banner{background:linear-gradient(135deg,var(--card2),var(--bg))!important}" +
+        "footer.dbf{background:radial-gradient(900px 260px at 12% 0,rgba(var(--gold-rgb),.09),transparent 70%),var(--bg)!important}" +
+        "footer.dbf .dbf-cta{background:linear-gradient(135deg,rgba(var(--gold-rgb),.1),var(--card) 70%)!important}" +
+        ".sk i{background:linear-gradient(90deg,var(--card2) 25%,var(--line) 50%,var(--card2) 75%)!important;background-size:200% 100%!important}";
+      if(light){
+        css += ".pt-rich p,.pt-rich ul,.rv p,[style*=\"color:#d4d4d4\"]{color:var(--text)!important}";
+      }
+    }
+    if(!old){ old = document.createElement("style"); old.id = "dbThemeStyle"; document.head.appendChild(old); }
+    old.textContent = css;
   }
   function applyTheme(set){
     set = set || {};
     var g = HEX.test(set.color_gold || "") ? set.color_gold : "";
     var sl = HEX.test(set.color_sale || "") ? set.color_sale : "";
-    try{ localStorage.setItem("digibaku_theme", JSON.stringify({g: g, s: sl})); }catch(e){}
-    paintTheme(g, sl);
+    var bg = HEX.test(set.color_bg || "") ? set.color_bg : "";
+    var cd = HEX.test(set.color_card || "") ? set.color_card : "";
+    try{ localStorage.setItem("digibaku_theme", JSON.stringify({g: g, s: sl, b: bg, c: cd})); }catch(e){}
+    paintTheme(g, sl, bg, cd);
   }
   try{
     var th = JSON.parse(localStorage.getItem("digibaku_theme") || "null");
-    if(th && (HEX.test(th.g || "") || HEX.test(th.s || ""))) paintTheme(HEX.test(th.g || "") ? th.g : "", HEX.test(th.s || "") ? th.s : "");
+    if(th){
+      var tg = HEX.test(th.g || "") ? th.g : "", ts = HEX.test(th.s || "") ? th.s : "";
+      var tb = HEX.test(th.b || "") ? th.b : "", tc = HEX.test(th.c || "") ? th.c : "";
+      if(tg || ts || tb || tc) paintTheme(tg, ts, tb, tc);
+    }
   }catch(e){}
 
-  // Çat düyməsi (admin paneldən): göstər/gizlət, rəng, kiçik şəkil ikon
+  // Çat və WhatsApp düymələri (admin paneldən): rəng və şəkil ikon; çat üçün göstər/gizlət də var.
   // İkonun ətrafındakı boş (şəffaf və ya tək rəngli) kənarlar avtomatik kəsilir ki, şəkil dairəni tam doldursun.
-  var trimCache = {}, fabSeq = 0;
+  var trimCache = {}, fabSeq = { chat: 0, wa: 0 };
   function trimIcon(src, cb){
     if(trimCache[src]){ cb(trimCache[src]); return; }
     var im = new Image();
@@ -122,46 +156,57 @@
     im.onerror = function(){ cb(src); };
     im.src = src;
   }
-  function paintChatFabNow(o){
+  var ICON_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
+  function paintFabNow(kind, o){
     o = o || {};
-    var old = document.getElementById("dbChatFabStyle");
+    var id = kind === "wa" ? "dbWaFabStyle" : "dbChatFabStyle";
+    var sel = kind === "wa" ? "a.fab.wa" : "a.fab.chat";
+    var old = document.getElementById(id);
     var css = "";
-    if(o.show === false){
+    if(kind === "chat" && o.show === false){
       css = "a.fab.chat,#dbChatLauncher{display:none!important}#dbChatGreet{display:none!important}";
     } else {
       if(HEX.test(o.color || "")){
-        css += "a.fab.chat{background-color:" + o.color + "!important;box-shadow:0 0 18px rgba(" + hexRgb(o.color).join(",") + ",.55)!important}";
+        css += sel + "{background-color:" + o.color + "!important;box-shadow:0 0 18px rgba(" + hexRgb(o.color).join(",") + ",.55)!important}";
       }
-      if(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(o.icon || "")){
-        css += "a.fab.chat svg{display:none!important}" +
-          "a.fab.chat{background-image:url(" + o.icon + ")!important;background-repeat:no-repeat!important;background-position:center!important;background-size:cover!important}";
+      if(ICON_RE.test(o.icon || "")){
+        css += sel + " svg{display:none!important}" +
+          sel + "{background-image:url(" + o.icon + ")!important;background-repeat:no-repeat!important;background-position:center!important;background-size:cover!important}";
       }
     }
     if(!css){ if(old) old.remove(); return; }
-    if(!old){ old = document.createElement("style"); old.id = "dbChatFabStyle"; document.head.appendChild(old); }
+    if(!old){ old = document.createElement("style"); old.id = id; document.head.appendChild(old); }
     old.textContent = css;
   }
-  function paintChatFab(o){
+  function paintFab(kind, o){
     o = o || {};
-    var seq = ++fabSeq;
-    var ico = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(o.icon || "") ? o.icon : "";
-    if(o.show === false || !ico){ paintChatFabNow(o); return; }
-    if(trimCache[ico]){ paintChatFabNow({ show: o.show, color: o.color, icon: trimCache[ico] }); return; }
-    paintChatFabNow({ show: o.show, color: o.color, icon: "" });
+    var seq = ++fabSeq[kind];
+    var ico = ICON_RE.test(o.icon || "") ? o.icon : "";
+    if(o.show === false || !ico){ paintFabNow(kind, o); return; }
+    if(trimCache[ico]){ paintFabNow(kind, { show: o.show, color: o.color, icon: trimCache[ico] }); return; }
+    paintFabNow(kind, { show: o.show, color: o.color, icon: "" });
     trimIcon(ico, function(t){
-      if(seq !== fabSeq) return;
-      paintChatFabNow({ show: o.show, color: o.color, icon: t });
+      if(seq !== fabSeq[kind]) return;
+      paintFabNow(kind, { show: o.show, color: o.color, icon: t });
     });
   }
   function applyChatFab(set){
     set = set || {};
     var o = { show: set.chat_show !== "0", color: HEX.test(set.color_chat || "") ? set.color_chat : "", icon: set.chat_icon || "" };
     try{ localStorage.setItem("digibaku_chatfab", JSON.stringify(o)); }catch(e){}
-    paintChatFab(o);
+    paintFab("chat", o);
+  }
+  function applyWaFab(set){
+    set = set || {};
+    var o = { color: HEX.test(set.color_wa || "") ? set.color_wa : "", icon: set.wa_icon || "" };
+    try{ localStorage.setItem("digibaku_wafab", JSON.stringify(o)); }catch(e){}
+    paintFab("wa", o);
   }
   try{
     var cf = JSON.parse(localStorage.getItem("digibaku_chatfab") || "null");
-    if(cf) paintChatFab(cf);
+    if(cf) paintFab("chat", cf);
+    var wf = JSON.parse(localStorage.getItem("digibaku_wafab") || "null");
+    if(wf) paintFab("wa", wf);
   }catch(e){}
 
   // Bayram effektləri (admin paneldən): assets/effects.js yalnız effekt aktiv olanda yüklənir
@@ -446,7 +491,7 @@
     fetch("/api/settings")
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d && d.settings){ DB.settings = d.settings; applySettings(); applyTheme(d.settings); applyChatFab(d.settings); applyFx(d.settings); }
+        if(d && d.settings){ DB.settings = d.settings; applySettings(); applyTheme(d.settings); applyChatFab(d.settings); applyWaFab(d.settings); applyFx(d.settings); }
         if(d && d.seo){ applySeo(d.seo); }
       })
       .catch(function(){});
