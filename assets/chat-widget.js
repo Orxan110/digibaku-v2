@@ -309,14 +309,17 @@
     if (window.innerWidth >= 900) tx.focus();
   }
   function renderEmoji() {
-    emoTabs.innerHTML = "";
-    CATS.forEach(function (c, idx) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = c.i;
-      if (idx === curCat) b.className = "on";
-      b.onclick = function () { curCat = idx; renderEmoji(); };
-      emoTabs.appendChild(b);
+    if (!emoTabs.children.length) {
+      CATS.forEach(function (c, idx) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = c.i;
+        b.onclick = function () { curCat = idx; renderEmoji(); };
+        emoTabs.appendChild(b);
+      });
+    }
+    Array.prototype.forEach.call(emoTabs.children, function (b, idx) {
+      b.className = idx === curCat ? "on" : "";
     });
     emoGrid.innerHTML = "";
     var c = CATS[curCat];
@@ -354,9 +357,10 @@
     emoBtn.setAttribute("aria-expanded", show ? "true" : "false");
   };
   document.addEventListener("click", function (e) {
-    var tg = e.target;
-    if (emoOpen() && !(tg.closest && tg.closest("#chatEmoji,#chatEmoBtn"))) hideEmo();
-    if (menuOpen() && !(tg.closest && tg.closest("#chatSndMenu,#chatSnd"))) hideMenu();
+    var path = e.composedPath ? e.composedPath() : [];
+    function inside(a, b2) { return path.indexOf(a) >= 0 || path.indexOf(b2) >= 0; }
+    if (emoOpen() && !inside(emoBox, emoBtn)) hideEmo();
+    if (menuOpen() && !inside(sndMenu, sndBtn)) hideMenu();
   });
 
   // ---------- İş saatları ----------
