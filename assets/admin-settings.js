@@ -56,11 +56,11 @@
       row("color_chat", "Çat düyməsinin rəngi", c || COLOR_DEFS.color_chat, !c, "Standart (mavi)") +
       '<div style="margin-top:12px"><label class="muted" style="font-size:12px">Kiçik şəkil / ikon (telefondan yüklə)</label>' +
       '<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap">' +
-      '<span data-ciprev style="width:44px;height:44px;border-radius:50%;border:1px solid #262626;background:#1a1a1a center/62% no-repeat;flex:0 0 auto"></span>' +
+      '<span data-ciprev style="width:44px;height:44px;border-radius:50%;border:1px solid #262626;background:#1a1a1a center/cover no-repeat;flex:0 0 auto"></span>' +
       '<label class="btn" style="cursor:pointer">Şəkil seç<input type="file" accept="image/*" data-cifile style="display:none"></label>' +
       '<button type="button" class="btn ghost" data-cidel style="padding:8px 12px;font-size:13px">Şəkli sil</button>' +
       '<span class="muted" style="font-size:12px" data-cimsg></span></div>' +
-      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart çat ikonu görünür. Şəffaf fonlu PNG ən yaxşı nəticəni verir.</p></div></div>';
+      '<p class="muted" style="font-size:11px;margin-top:6px">Şəkil yoxdursa standart çat ikonu görünür. Şəkil çat dairəsinin tam ölçüsündə görünür (kvadrat şəkil ən yaxşı nəticəni verir).</p></div></div>';
   }
   function paintIconPreview() {
     var pv = list.querySelector("[data-ciprev]");
@@ -83,12 +83,13 @@
             var cv = document.createElement("canvas");
             cv.width = size; cv.height = size;
             var cx = cv.getContext("2d");
-            var sc = Math.min(size / im.width, size / im.height);
+            var sc = Math.max(size / im.width, size / im.height); // cover: dairəni tam doldurur
             var w = im.width * sc, h = im.height * sc;
             cx.drawImage(im, (size - w) / 2, (size - h) / 2, w, h);
             return cv.toDataURL("image/png");
           }
-          var out = make(96);
+          var out = make(128);
+          if (out.length > 85000) out = make(96);
           if (out.length > 85000) out = make(64);
           if (out.length > 85000) { msg.textContent = "Şəkil çox mürəkkəbdir, daha sadə şəkil seçin."; return; }
           chatIcon = out; paintIconPreview();
@@ -183,6 +184,7 @@
     btn.disabled = false;
     if (r.status === 401) { expired(); return; }
     if (!r.ok) { showMsg(fetchErr(r, "Parametrlər yadda saxlanmadı.")); return; }
+    if (window.AdminTheme) window.AdminTheme.fromSettings({ color_gold: collect().color_gold, color_sale: collect().color_sale });
     showMsg("Yadda saxlandı. Saytda dəyişiklik bir neçə saniyə ərzində görünəcək.");
   }
 
