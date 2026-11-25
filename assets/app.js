@@ -86,7 +86,7 @@
       }
       if(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(o.icon || "")){
         css += "a.fab.chat svg{display:none!important}" +
-          "a.fab.chat{background-image:url(" + o.icon + ")!important;background-repeat:no-repeat!important;background-position:center!important;background-size:62%!important}";
+          "a.fab.chat{background-image:url(" + o.icon + ")!important;background-repeat:no-repeat!important;background-position:center!important;background-size:cover!important}";
       }
     }
     if(!css){ if(old) old.remove(); return; }
