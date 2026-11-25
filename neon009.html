@@ -6,13 +6,14 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <title>Giriş</title>
 <link rel="stylesheet" href="assets/style.css">
+<script src="assets/admin-theme.js"></script>
 <style>
   .ad-layout{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
   .ad-side{background:#0c0c0c;border-right:1px solid #262626;padding:18px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
-  .ad-brand{color:#d4af37;font-weight:800;font-size:18px;margin:0 8px 18px}
+  .ad-brand{color:var(--gold);font-weight:800;font-size:18px;margin:0 8px 18px}
   .ad-link{display:block;padding:11px 12px;border-radius:10px;color:#f5f5f5;font-size:15px;margin-bottom:4px;cursor:pointer;border:0;background:none;text-align:left;width:100%}
   .ad-link:hover{background:#1a1a1a}
-  .ad-link.on{background:#d4af37;color:#000;font-weight:700}
+  .ad-link.on{background:var(--gold);color:var(--on-gold,#000);font-weight:700}
   .ad-link.dis{color:#6b6b6b;cursor:default}
   .ad-link.dis:hover{background:none}
   .ad-main{padding:16px 18px;min-width:0}
@@ -21,11 +22,11 @@
   .ad-burger{display:none;width:42px;height:42px;border-radius:10px;border:1px solid #262626;background:#111;color:#f5f5f5;font-size:20px;cursor:pointer}
   .ad-out{margin-top:18px;color:#f87171}
   .lg-card{width:100%;max-width:380px;margin:0 auto;background:#111;border:1px solid #262626;border-radius:16px;padding:26px 22px}
-  .lg-logo{color:#d4af37;font-weight:800;font-size:24px;text-align:center;margin-bottom:14px}
+  .lg-logo{color:var(--gold);font-weight:800;font-size:24px;text-align:center;margin-bottom:14px}
   .lg-h{font-size:18px;margin:0 0 16px;text-align:center}
   .lg-l{display:block;font-size:12px;color:#a3a3a3;margin:12px 0 6px}
   .lg-i{width:100%;padding:12px;border-radius:10px;border:1px solid #262626;background:#1a1a1a;color:#f5f5f5;box-sizing:border-box;font-size:16px;outline:none}
-  .lg-i:focus{border-color:#d4af37}
+  .lg-i:focus{border-color:var(--gold)}
   body.locked .ad-layout{display:flex;align-items:center;justify-content:center;padding:20px}
   body.locked .ad-side,body.locked .ad-top{display:none}
   body.locked .ad-main{width:100%;padding:0}
