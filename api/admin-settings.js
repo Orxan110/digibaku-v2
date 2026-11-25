@@ -3,7 +3,8 @@ const { verify } = require("./_auth");
 
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
-  "whatsapp", "phone", "email", "instagram", "tiktok"];
+  "whatsapp", "phone", "email", "instagram", "tiktok",
+  "color_gold", "color_sale", "color_chat", "chat_show"];
 const PAGE_KEYS = ["about", "rules", "privacy", "terms"];
 const SEO_KEYS = ["default", "home", "products", "faq", "contact", "about", "rules", "privacy", "terms"];
 const LANGS = ["az", "ru", "en"];
@@ -64,6 +65,13 @@ module.exports = async function handler(req, res) {
     if (next.tiktok && !/^https?:\/\//.test(next.tiktok)) {
       return res.status(400).json({ ok: false, error: "TikTok linki https:// ilə başlamalıdır." });
     }
+    ["color_gold", "color_sale", "color_chat"].forEach(function (k) {
+      if (next[k] && !/^#[0-9a-fA-F]{6}$/.test(next[k])) next[k] = "";
+    });
+    next.chat_show = next.chat_show === "0" ? "0" : "1";
+    // Çat düyməsinin kiçik şəkli (brauzerdə kiçildilmiş data URL)
+    const ico = String(b.chat_icon == null ? "" : b.chat_icon).trim();
+    next.chat_icon = (ico.length <= 90000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(ico)) ? ico : "";
     await putVal("general", next);
     return res.status(200).json({ ok: true });
   }
