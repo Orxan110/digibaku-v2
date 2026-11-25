@@ -306,6 +306,7 @@
 
   document.addEventListener("DOMContentLoaded", function(){
     header(); bottomNav(); fabs(); updateCartBadge(); authState();
+        var ft=document.createElement("script"); ft.src="/assets/footer.js"; document.body.appendChild(ft);
     startI18n();
     loadSettings();
     loadChatWidget();
