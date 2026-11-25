@@ -298,9 +298,16 @@
     }
   }
 
+    // Çat paneli: bütün səhifələrdə sağdan açılan yan panel (assets/chat-widget.js)
+  function loadChatWidget(){
+    if(document.getElementById("dbChatPanel")) return;
+    var s=document.createElement("script"); s.src="/assets/chat-widget.js"; document.body.appendChild(s);
+  }
+
   document.addEventListener("DOMContentLoaded", function(){
     header(); bottomNav(); fabs(); updateCartBadge(); authState();
     startI18n();
     loadSettings();
+    loadChatWidget();
   });
 })();
