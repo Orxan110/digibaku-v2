@@ -82,7 +82,8 @@
     row.className = "cm-row " + (mine ? "me" : "them") + (pending ? " pending" : "");
     var b = document.createElement("div");
     b.className = "cm-b";
-    if (mine) b.textContent = m.body;                 // ziyarətçi mətni heç vaxt HTML kimi oxunmur
+    if (m.file_id) b.appendChild(fileEl(m));
+    else if (mine) b.textContent = m.body;            // ziyarətçi mətni heç vaxt HTML kimi oxunmur
     else b.innerHTML = window.ChatRender ? ChatRender.html(m.body) : "";
     var meta = document.createElement("div");
     meta.className = "cm-meta";
@@ -90,6 +91,121 @@
     row.appendChild(b);
     row.appendChild(meta);
     return row;
+  }
+
+  // ---------- Fayl göndərmə ----------
+  var FTX = {
+    az: { attach: "Fayl əlavə et", type: "Bu fayl növü qəbul olunmur (JPG, PNG, WEBP, GIF, PDF, TXT, DOCX, XLSX).", big: "Fayl çox böyükdür (maksimum 2.5 MB)." },
+    ru: { attach: "Прикрепить файл", type: "Этот тип файла не поддерживается (JPG, PNG, WEBP, GIF, PDF, TXT, DOCX, XLSX).", big: "Файл слишком большой (максимум 2.5 МБ)." },
+    en: { attach: "Attach file", type: "This file type is not supported (JPG, PNG, WEBP, GIF, PDF, TXT, DOCX, XLSX).", big: "File is too large (max 2.5 MB)." }
+  };
+  var FT = FTX[lang] || FTX.az;
+  var FILE_EXT = ["jpg", "jpeg", "png", "webp", "gif", "pdf", "txt", "docx", "xlsx"];
+  var MAX_FILE = 2.5 * 1024 * 1024;
+  var attachBtn = document.getElementById("chatAttach");
+  var fileInput = document.getElementById("chatFile");
+
+  function fmtSize(n) {
+    n = Number(n) || 0;
+    return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+  }
+  function fileEl(m) {
+    var url = "/api/chat?action=file&id=" + encodeURIComponent(m.file_id);
+    var a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "cm-file";
+    if (/^image\//.test(m.file_type || "")) {
+      var im = document.createElement("img");
+      im.src = url; im.alt = m.file_name || ""; im.loading = "lazy";
+      im.onload = function () { scrollDown(); };
+      a.className = "cm-file img";
+      a.appendChild(im);
+    } else {
+      var ic = document.createElement("span"); ic.textContent = "📎";
+      var tx = document.createElement("span"); tx.className = "cm-file-t";
+      tx.textContent = (m.file_name || "file") + (m.file_size ? " · " + fmtSize(m.file_size) : "");
+      a.appendChild(ic); a.appendChild(tx);
+    }
+    return a;
+  }
+  function readB64(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result).split(",")[1] || ""); };
+      fr.onerror = function () { reject(new Error(t.err)); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  // Böyük şəkilləri göndərmədən əvvəl kiçildir (telefon şəkilləri adətən 3-8 MB olur)
+  function prepare(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 500 * 1024) return resolve(file);
+      var fr = new FileReader();
+      fr.onerror = function () { resolve(file); };
+      fr.onload = function () {
+        var img = new Image();
+        img.onerror = function () { resolve(file); };
+        img.onload = function () {
+          var s = Math.min(1, 1600 / Math.max(img.width, img.height));
+          var c = document.createElement("canvas");
+          c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+          var x = c.getContext("2d");
+          x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+          x.drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob(function (bl) {
+            if (!bl || bl.size >= file.size) return resolve(file);
+            resolve(new File([bl], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+          }, "image/jpeg", 0.82);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  async function sendFile(file) {
+    if (sending || !file) return;
+    errEl.textContent = "";
+    var ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (FILE_EXT.indexOf(ext) < 0) { errEl.textContent = FT.type; return; }
+    sending = true;
+    sendBtn.disabled = true;
+    if (attachBtn) attachBtn.disabled = true;
+
+    var now = new Date().toISOString();
+    addDay(now);
+    var pend = bubble({ sender: "visitor", body: "📎 " + file.name, created_at: now }, true);
+    box.appendChild(pend);
+    scrollDown();
+
+    try {
+      file = await prepare(file);
+      if (file.size > MAX_FILE) throw new Error(FT.big);
+      var data = await readB64(file);
+      var r = await fetch("/api/chat?action=upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token, name: nameEl.value, file_name: file.name, data: data, lang: lang })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok || !d.ok) throw new Error(d.error || t.err);
+      if (d.token && d.token !== token) {
+        token = d.token;
+        try { localStorage.setItem(KEY, token); } catch (e) {}
+        nameEl.style.display = "none";
+      }
+      if (pend.parentNode) pend.parentNode.removeChild(pend);
+      addMessages([d.message]);
+      if (d.bot) addMessages([d.bot]);
+      scrollDown();
+    } catch (e) {
+      if (pend.parentNode) pend.parentNode.removeChild(pend);
+      errEl.textContent = (e && e.message && e.message !== "Failed to fetch") ? e.message : t.err;
+    }
+    sending = false;
+    sendBtn.disabled = false;
+    if (attachBtn) attachBtn.disabled = false;
+    lastActivity = Date.now();
+    schedule();
   }
 
   function addMessages(list) {
@@ -221,6 +337,16 @@
   });
 
   sendBtn.onclick = function () { send(); };
+  if (attachBtn && fileInput) {
+    attachBtn.title = FT.attach;
+    attachBtn.setAttribute("aria-label", FT.attach);
+    attachBtn.onclick = function () { if (!sending) fileInput.click(); };
+    fileInput.onchange = function () {
+      var f = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (f) sendFile(f);
+    };
+  }
   textEl.addEventListener("input", autosize);
   textEl.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
