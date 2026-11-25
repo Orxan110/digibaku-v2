@@ -24,10 +24,85 @@
       var ph = document.createElement("span");
       ph.className = "imgfb";
       ph.textContent = name;
-      ph.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:8px;box-sizing:border-box;text-align:center;font-weight:800;font-size:clamp(16px,4vw,24px);color:#d4af37;letter-spacing:.5px";
+      ph.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:8px;box-sizing:border-box;text-align:center;font-weight:800;font-size:clamp(16px,4vw,24px);color:var(--gold);letter-spacing:.5px";
       im.replaceWith(ph);
     }, true);
   })();
+
+
+  // Rəng mövzusu (admin paneldən): əsas rəng (--gold) və endirim rəngi (--sale).
+  // Son seçim yadda saxlanılır ki, səhifə açılanda köhnə rəng "yanıb-sönməsin".
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+  function hexRgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+  function rgbHex(a){ return "#" + a.map(function(n){ n = Math.max(0, Math.min(255, Math.round(n))); return (n < 16 ? "0" : "") + n.toString(16); }).join(""); }
+  function onColor(h){ var c = hexRgb(h); return (c[0]*0.299 + c[1]*0.587 + c[2]*0.114) > 150 ? "#000" : "#fff"; }
+  function paintTheme(g, sl){
+    var st = document.documentElement.style;
+    ["--gold","--gold-d","--gold-rgb","--sale","--on-gold","--on-sale"].forEach(function(k){ st.removeProperty(k); });
+    var old = document.getElementById("dbThemeStyle");
+    if(!g && !sl){ if(old) old.remove(); return; }
+    var c = hexRgb(g || "#d4af37");
+    if(g){
+      st.setProperty("--gold", g);
+      st.setProperty("--gold-d", rgbHex(c.map(function(n){ return n * 0.86; })));
+    }
+    st.setProperty("--gold-rgb", c.join(","));
+    st.setProperty("--on-gold", g ? onColor(g) : "#000");
+    if(sl) st.setProperty("--sale", sl);
+    st.setProperty("--on-sale", onColor(sl || g));
+    if(!old){ old = document.createElement("style"); old.id = "dbThemeStyle"; document.head.appendChild(old); }
+    old.textContent =
+      ".btn.gold,.badge,.chat-av,.cm-row.me .cm-b,.chat-send,.chip.on,.ptabs-nav button.on,.pt-rich ol.pt-steps li::before,.dbf-btn.fill,.dbf-brand .mk{color:var(--on-gold)!important}" +
+      ".pbadge,.sale{background:var(--sale,var(--gold))!important;color:var(--on-sale)!important}" +
+      ".stars,.starpick button.on,[style*=\"color:#d4af37\"]{color:var(--gold)!important}" +
+      "[style*=\"border:1px solid #d4af37\"]{border-color:var(--gold)!important}" +
+      "footer.dbf{background:radial-gradient(900px 260px at 12% 0,rgba(var(--gold-rgb),.09),transparent 70%),#050505!important}" +
+      "footer.dbf .dbf-cta{border-color:rgba(var(--gold-rgb),.35)!important;background:linear-gradient(135deg,rgba(var(--gold-rgb),.1),#0c0c0c 70%)!important}" +
+      "footer.dbf .dbf-btn.line:hover,.btn-out:hover{background:rgba(var(--gold-rgb),.12)!important}" +
+      "#dbChatPanel .chat-hours{background:rgba(var(--gold-rgb),.12)!important}";
+  }
+  function applyTheme(set){
+    set = set || {};
+    var g = HEX.test(set.color_gold || "") ? set.color_gold : "";
+    var sl = HEX.test(set.color_sale || "") ? set.color_sale : "";
+    try{ localStorage.setItem("digibaku_theme", JSON.stringify({g: g, s: sl})); }catch(e){}
+    paintTheme(g, sl);
+  }
+  try{
+    var th = JSON.parse(localStorage.getItem("digibaku_theme") || "null");
+    if(th && (HEX.test(th.g || "") || HEX.test(th.s || ""))) paintTheme(HEX.test(th.g || "") ? th.g : "", HEX.test(th.s || "") ? th.s : "");
+  }catch(e){}
+
+  // Çat düyməsi (admin paneldən): göstər/gizlət, rəng, kiçik şəkil ikon
+  function paintChatFab(o){
+    o = o || {};
+    var old = document.getElementById("dbChatFabStyle");
+    var css = "";
+    if(o.show === false){
+      css = "a.fab.chat,#dbChatLauncher{display:none!important}#dbChatGreet{display:none!important}";
+    } else {
+      if(HEX.test(o.color || "")){
+        css += "a.fab.chat{background-color:" + o.color + "!important;box-shadow:0 0 18px rgba(" + hexRgb(o.color).join(",") + ",.55)!important}";
+      }
+      if(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(o.icon || "")){
+        css += "a.fab.chat svg{display:none!important}" +
+          "a.fab.chat{background-image:url(" + o.icon + ")!important;background-repeat:no-repeat!important;background-position:center!important;background-size:62%!important}";
+      }
+    }
+    if(!css){ if(old) old.remove(); return; }
+    if(!old){ old = document.createElement("style"); old.id = "dbChatFabStyle"; document.head.appendChild(old); }
+    old.textContent = css;
+  }
+  function applyChatFab(set){
+    set = set || {};
+    var o = { show: set.chat_show !== "0", color: HEX.test(set.color_chat || "") ? set.color_chat : "", icon: set.chat_icon || "" };
+    try{ localStorage.setItem("digibaku_chatfab", JSON.stringify(o)); }catch(e){}
+    paintChatFab(o);
+  }
+  try{
+    var cf = JSON.parse(localStorage.getItem("digibaku_chatfab") || "null");
+    if(cf) paintChatFab(cf);
+  }catch(e){}
 
   var T = {
     az:{home:"Ana səhifə",products:"Məhsullar",cart:"Səbət",orders:"Sifarişlər",profile:"Profilim",
@@ -280,7 +355,7 @@
     fetch("/api/settings")
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d && d.settings){ DB.settings = d.settings; applySettings(); }
+        if(d && d.settings){ DB.settings = d.settings; applySettings(); applyTheme(d.settings); applyChatFab(d.settings); }
         if(d && d.seo){ applySeo(d.seo); }
       })
       .catch(function(){});
@@ -306,7 +381,7 @@
 
   document.addEventListener("DOMContentLoaded", function(){
     header(); bottomNav(); fabs(); updateCartBadge(); authState();
-        var ft=document.createElement("script"); ft.src="/assets/footer.js"; document.body.appendChild(ft);
+    var ft=document.createElement("script"); ft.src="/assets/footer.js"; document.body.appendChild(ft);
     startI18n();
     loadSettings();
     loadChatWidget();
