@@ -301,7 +301,9 @@
     // Çat paneli: bütün səhifələrdə sağdan açılan yan panel (assets/chat-widget.js)
   function loadChatWidget(){
     if(document.getElementById("dbChatPanel")) return;
-    var s=document.createElement("script"); s.src="/assets/chat-widget.js"; document.body.appendChild(s);
+        var s=document.createElement("script"); s.src="/assets/chat-widget.js"; document.body.appendChild(s);
+    var f=document.createElement("script"); f.src="/assets/footer.js"; document.body.appendChild(f);
+  }
   }
 
   document.addEventListener("DOMContentLoaded", function(){
