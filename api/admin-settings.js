@@ -4,7 +4,8 @@ const { verify } = require("./_auth");
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
   "whatsapp", "phone", "email", "instagram", "tiktok",
-  "color_gold", "color_sale", "color_chat", "chat_show"];
+  "color_gold", "color_sale", "color_chat", "chat_show",
+  "fx_type", "fx_level", "fx_from", "fx_to"];
 const PAGE_KEYS = ["about", "rules", "privacy", "terms"];
 const SEO_KEYS = ["default", "home", "products", "faq", "contact", "about", "rules", "privacy", "terms"];
 const LANGS = ["az", "ru", "en"];
@@ -69,6 +70,12 @@ module.exports = async function handler(req, res) {
       if (next[k] && !/^#[0-9a-fA-F]{6}$/.test(next[k])) next[k] = "";
     });
     next.chat_show = next.chat_show === "0" ? "0" : "1";
+    // Bayram effekti
+    if (["snow", "bonfire", "confetti", "hearts", "fireworks", "petals"].indexOf(next.fx_type) < 0) next.fx_type = "";
+    if (["1", "2", "3"].indexOf(next.fx_level) < 0) next.fx_level = "2";
+    ["fx_from", "fx_to"].forEach(function (k) {
+      if (next[k] && !/^\d{4}-\d{2}-\d{2}$/.test(next[k])) next[k] = "";
+    });
     // Çat düyməsinin kiçik şəkli (brauzerdə kiçildilmiş data URL)
     const ico = String(b.chat_icon == null ? "" : b.chat_icon).trim();
     next.chat_icon = (ico.length <= 90000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(ico)) ? ico : "";
