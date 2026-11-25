@@ -10,6 +10,72 @@
   var lastId = 0;
 
   function stop() { if (timer) { clearInterval(timer); timer = null; } current = null; }
+  // ---------- Emoji seçimi ----------
+  var EMO_CATS = [
+    { i: "✨", all: true },
+    { i: "😀", l: "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 😉 😍 🥰 😘 😋 😎 🤩 🥳 🤗 🤔 😐 😴 😢 😭 😡 😱 🙄 😬 🤯 🥺 😏" },
+    { i: "👍", l: "👍 👎 👌 ✌️ 🤞 🤝 👏 🙌 💪 👋 🙏 👀 🤙 ☝️ 👉 👈" },
+    { i: "❤️", l: "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯 ✨ ⭐ 🔥 🎉 ✅ ❌ ⚠️ ❓ ❗ 💬" },
+    { i: "🎁", l: "🎁 📎 📷 💳 💰 🛒 📦 🚀 🎧 🎬 🎮 📚 💻 📱 🔑 🔒 ⏰ 📅 📧 🌐" }
+  ];
+  function setupEmoji(ta) {
+    var box = document.getElementById("adEmoBox"), btn = document.getElementById("adEmo");
+    if (!box || !btn || !ta) return;
+    var tabs = document.createElement("div");
+    tabs.style.cssText = "display:flex;gap:2px;padding:4px 6px 0;border-bottom:1px solid #262626";
+    var grid = document.createElement("div");
+    grid.style.cssText = "display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-height:170px;overflow-y:auto;padding:8px";
+    box.appendChild(tabs);
+    box.appendChild(grid);
+    var cur = 0;
+    function paint() {
+      Array.prototype.forEach.call(tabs.children, function (b, idx) {
+        b.style.borderBottomColor = idx === cur ? "#d4af37" : "transparent";
+        b.style.opacity = idx === cur ? "1" : ".6";
+      });
+      grid.innerHTML = "";
+      var c = EMO_CATS[cur], list = [];
+      if (c.all) EMO_CATS.forEach(function (x) { if (x.l) list = list.concat(x.l.split(" ")); });
+      else list = c.l.split(" ");
+      list.forEach(function (em) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = em;
+        b.style.cssText = "border:0;background:transparent;font-size:22px;line-height:1;padding:5px 0;border-radius:8px;cursor:pointer";
+        b.onclick = function () {
+          var st = ta.selectionStart, en = ta.selectionEnd;
+          if (typeof st !== "number") { st = en = ta.value.length; }
+          if (ta.value.length - (en - st) + em.length > (ta.maxLength > 0 ? ta.maxLength : 2000)) return;
+          ta.setRangeText(em, st, en, "end");
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+          ta.focus();
+        };
+        grid.appendChild(b);
+      });
+    }
+    EMO_CATS.forEach(function (c, idx) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = c.i;
+      b.style.cssText = "flex:1;border:0;border-bottom:2px solid transparent;background:transparent;font-size:18px;line-height:1;padding:7px 0;cursor:pointer";
+      b.onclick = function () { cur = idx; paint(); };
+      tabs.appendChild(b);
+    });
+    btn.onclick = function () {
+      var show = box.style.display === "none";
+      box.style.display = show ? "block" : "none";
+      if (show) { cur = 0; paint(); }
+    };
+  }
+  // Kənara basanda emoji siyahısı bağlansın
+  document.addEventListener("click", function (e) {
+    var box = document.getElementById("adEmoBox");
+    if (!box || box.style.display === "none") return;
+    var path = e.composedPath ? e.composedPath() : [];
+    if (path.indexOf(box) >= 0 || path.indexOf(document.getElementById("adEmo")) >= 0) return;
+    box.style.display = "none";
+  });
+
   function rate(v) { return Number(v) === 1 ? " 👍" : (Number(v) === -1 ? " 👎" : ""); }
   function fmt(d) {
     try { return new Date(d).toLocaleString("az-AZ"); } catch (e) { return ""; }
@@ -114,9 +180,12 @@
       '<button class="btn" id="adDel" style="color:#f87171">Sil</button></div>' +
       '<div class="card-box"><b>' + esc(th.visitor_name || "Qonaq") + rate(th.rating) + "</b>" +
       '<div id="adMsgs" style="height:44vh;min-height:240px;overflow-y:auto;margin-top:10px;padding-right:4px"></div>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<div style="position:relative;margin-top:10px">' +
+      '<div id="adEmoBox" style="display:none;position:absolute;left:0;right:0;bottom:100%;margin-bottom:6px;background:#1a1a1a;border:1px solid #262626;border-radius:12px;z-index:5;overflow:hidden"></div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn" id="adEmo" type="button" title="Emoji" style="font-size:20px;padding:6px 12px">😊</button>' +
       '<textarea id="adText" rows="2" maxlength="2000" placeholder="Cavabınızı yazın..." style="flex:1;' + INP + ';resize:none"></textarea>' +
-      '<button class="btn gold" id="adSend">Göndər</button></div></div>';
+      '<button class="btn gold" id="adSend">Göndər</button></div></div></div>';
     appendMessages(r.data.messages || []);
 
     document.getElementById("adBack").onclick = function () { loadThreads(); };
@@ -149,6 +218,7 @@
       appendMessages([x.data.message]);
     }
     document.getElementById("adSend").onclick = sendReply;
+    setupEmoji(document.getElementById("adText"));
     // Operator yazarkən müştəriyə "yazır..." siqnalı (2.5 san-də bir dəfə)
     var lastTyping = 0;
     document.getElementById("adText").addEventListener("input", function () {
