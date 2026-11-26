@@ -141,7 +141,7 @@
     var b = await api(PATH + "audit_list");
     var checks = (a.data && a.data.checks) || [];
     var rows = (b.ok && b.data && b.data.rows) || [];
-    var auditErr = b.ok ? "" : fetchErr(b, "Jurnal yüklənmədi.");
+    var auditErr = b.ok ? ((b.data && b.data.writeError) ? "Jurnala yazılmır: " + b.data.writeError : "") : fetchErr(b, "Jurnal yüklənmədi.");
     list.innerHTML =
       '<div class="card-box" style="margin-bottom:12px"><b>Təhlükəsizlik yoxlaması</b>' +
       checks.map(function (c) {
