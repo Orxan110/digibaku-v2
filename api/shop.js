@@ -12,7 +12,7 @@ function fixCookie(c) {
 }
 
 // Yalnız saytın istifadə etdiyi (və təhlükəsiz) auth ünvanlarına icazə verilir
-const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email)$/;
+const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email|update-user|change-email|change-password)$/;
 
 async function authProxy(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -35,7 +35,8 @@ async function authProxy(req, res) {
     let ok = true;
     if (path === "sign-in/email") ok = await rateLimit("auth-in:" + ip, 10, 600);
     else if (path === "sign-up/email") ok = await rateLimit("auth-up:" + ip, 5, 3600);
-    else if (/password|verif/.test(path)) ok = await rateLimit("auth-pw:" + ip, 5, 3600);
+    else if (/password|verif/.test(path) && path !== "change-password") ok = await rateLimit("auth-pw:" + ip, 5, 3600);
+    else if (path === "change-password" || path === "change-email") ok = await rateLimit("auth-chg:" + ip, 10, 3600);
     if (!ok) return res.status(429).json({ message: "Çox cəhd edildi. Bir az sonra yenidən yoxlayın." });
   }
 
