@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("./_db");
+const AUTH = require("./_auth");
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
@@ -89,7 +90,7 @@ function txt(v) {
   return s ? s : null;
 }
 
-module.exports = async function handler(req, res) {
+async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const action = (req.query && req.query.action) || "";
 
@@ -99,11 +100,13 @@ module.exports = async function handler(req, res) {
     if (!pass || !process.env.ADMIN_SECRET) {
       return res.status(500).json({ ok: false, error: "ADMIN_PASSWORD və ya ADMIN_SECRET Vercel-də təyin olunmayıb." });
     }
-    const ip = String((req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")).split(",")[0].trim() || "?";
-    const rec = loginTries.get(ip) || { n: 0, until: 0 };
-    if (Date.now() < rec.until) {
-      return res.status(429).json({ ok: false, error: "Çox sayda uğursuz cəhd. Bir az sonra yenidən yoxlayın." });
+        const ip = AUTH.clientIp(req);
+    const okIp = await AUTH.rateLimit("login:" + ip, 10, 900);
+    const okAll = await AUTH.rateLimit("login:all", 60, 900);
+    if (!okIp || !okAll) {
+      return res.status(429).json({ ok: false, error: "Çox sayda cəhd. Bir az sonra yenidən yoxlayın." });
     }
+    const rec = { n: 0, until: 0 };
     const b = body(req);
     // Hər iki sahə həmişə yoxlanır (hansının səhv olduğu bilinməsin)
     const okEmail = safeEq(String(b.email || "").trim().toLowerCase(), adminEmail);
@@ -522,4 +525,29 @@ module.exports = async function handler(req, res) {
   }
   // ================= ADMIN-EXTRA (son) =================
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
+}
+module.exports = async function handler(req, res) {
+  const action = (req.query && req.query.action) || "";
+  try {
+    if (req.method === "POST" && action !== "login") {
+      const b = body(req);
+      if (action === "product_save") {
+        const img = String(b.image_url || "").trim();
+        if (img && !(img.charAt(0) === "/" || /^https:\/\//.test(img))) {
+          res.setHeader("Cache-Control", "no-store");
+          return res.status(400).json({ ok: false, error: "Şəkil linki / və ya https:// ilə başlamalıdır." });
+        }
+      }
+      const adm = verify(String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim());
+      if (adm && adm.role === "admin" && action !== "image_upload") {
+        const d = [b.id, b.product_key, b.key, b.slug, b.status, b.percent, b.category_key, b.thread]
+          .filter(function (x) { return x !== undefined && x !== null && x !== ""; }).join(" | ");
+        await AUTH.audit(action, d, AUTH.clientIp(req));
+      }
+    }
+    await inner(req, res);
+  } catch (e) {
+    console.error("admin:", e);
+    if (!res.headersSent) return res.status(500).json({ ok: false, error: "Server xətası." });
+  }
 };
