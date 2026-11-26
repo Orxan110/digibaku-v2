@@ -199,10 +199,60 @@ async function review(req, res) {
   }
 }
 
+// Sevimlilər: GET → istifadəçinin product_key siyahısı; POST {product_key, on} → əlavə/silmə
+let wishReady = null;
+function ensureWishTable() {
+  if (!wishReady) {
+    wishReady = pool.query(`create table if not exists wishlist (
+        user_id text not null,
+        product_key text not null,
+        created_at timestamptz not null default now(),
+        primary key (user_id, product_key))`)
+      .catch(function (e) { wishReady = null; throw e; });
+  }
+  return wishReady;
+}
+
+async function wishlist(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ ok: false, error: "Sevimlilər üçün daxil olun." });
+  try {
+    await ensureWishTable();
+    if (req.method === "GET") {
+      const r = await pool.query(
+        "select product_key from wishlist where user_id = $1 order by created_at desc", [user.id]);
+      return res.status(200).json({ ok: true, keys: r.rows.map(function (x) { return x.product_key; }) });
+    }
+    if (req.method === "POST") {
+      if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: "Forbidden" });
+      if (!(await rateLimit("wish:" + user.id, 120, 3600))) {
+        return res.status(429).json({ ok: false, error: "Çox tez-tez dəyişirsiniz. Bir az gözləyin." });
+      }
+      const b = body(req);
+      const key = await findProduct(String(b.product_key || "").trim().slice(0, 100));
+      if (!key) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+      const on = b.on === true || b.on === "true";
+      if (on) {
+        await pool.query(
+          "insert into wishlist (user_id, product_key) values ($1, $2) on conflict do nothing", [user.id, key]);
+      } else {
+        await pool.query("delete from wishlist where user_id = $1 and product_key = $2", [user.id, key]);
+      }
+      return res.status(200).json({ ok: true, on: on, product_key: key });
+    }
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
+  } catch (e) {
+    console.error("wishlist:", e);
+    return res.status(500).json({ ok: false, error: "Sevimlilər yadda saxlanmadı." });
+  }
+}
+
 module.exports = async function handler(req, res) {
   const action = (req.query && req.query.action) || "";
   if (action === "auth") return authProxy(req, res);
   if (action === "extra" && req.method === "GET") return extra(req, res);
   if (action === "review") return review(req, res);
+  if (action === "wish") return wishlist(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };
