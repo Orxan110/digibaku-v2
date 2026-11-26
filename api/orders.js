@@ -1,5 +1,6 @@
 const { pool, getUserId } = require("./_db");
 const { rateLimit, sameOrigin } = require("./_auth");
+const { activeDiscounts, unitPrice } = require("../lib/pricing");
 
 const MONTHS = [1, 2, 3, 6, 12];
 const BAD_COUPON = "Kupon etibarsızdır və ya müddəti bitib.";
@@ -65,6 +66,7 @@ async function priceCart(input) {
      from site_products p join product_prices pp on pp.product_key = p.product_key
      where p.active = true and p.product_key = any($1)`, [keys]);
   const map = new Map(rows.rows.map(r => [r.product_key, r]));
+  const discounts = await activeDiscounts(pool);
 
   const items = [];
   let subtotal = 0;
@@ -73,10 +75,9 @@ async function priceCart(input) {
     const qty = Math.min(10, Math.max(1, parseInt(i && i.qty, 10) || 1));
     const r = map.get(String((i && i.product_key) || ""));
     if (!r || !MONTHS.includes(months)) throw httpErr(400, "Səbətdə etibarsız məhsul var.");
-    const sale = Number(r[`sale_${months}_price`]);
-    const base = Number(r[`price_${months}_month`]);
-    const unit = r[`sale_${months}_active`] === true && sale > 0 ? sale : base;
-    if (!(unit > 0)) throw httpErr(400, "Bu müddət üçün qiymət yoxdur.");
+    const u = unitPrice(r, months, discounts);
+    if (!u || !(u.price > 0)) throw httpErr(400, "Bu müddət üçün qiymət yoxdur.");
+    const unit = u.price;
     items.push({ product_key: r.product_key, name: r.name_az, months, qty, unit_price: Number(unit.toFixed(2)) });
     subtotal += unit * qty;
   }

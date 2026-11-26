@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { pool } = require("./_db");
 const AUTH = require("./_auth");
+const { ensureDiscountTable } = require("../lib/pricing");
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
@@ -586,6 +587,61 @@ async function inner(req, res) {
       return res.status(400).json({ ok: false, error: "İstifadə olunmuş kuponu silmək olmaz. Onu söndürün." });
     }
     await pool.query("delete from coupons where code = $1", [code]);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ================= PLANLI ENDİRİM =================
+  if (req.method === "GET" && action === "discounts") {
+    await ensureDiscountTable(pool);
+    const r = await pool.query(
+      `select id, name, percent, product_keys, months, starts_at, ends_at, active
+       from scheduled_discounts order by starts_at desc limit 200`);
+    return res.status(200).json({ ok: true, discounts: r.rows });
+  }
+
+  if (req.method === "POST" && action === "discount_save") {
+    await ensureDiscountTable(pool);
+    const b = body(req);
+    const name = txt(b.name);
+    if (!name) return res.status(400).json({ ok: false, error: "Endirimə ad verin." });
+    const percent = num(b.percent);
+    if (!(percent > 0 && percent < 100)) return res.status(400).json({ ok: false, error: "Faiz 0 ilə 100 arasında olmalıdır." });
+    const parseDate = function (v) {
+      if (!v) return null;
+      const raw = String(v);
+      // Admin Bakı vaxtı ilə daxil edir (+04:00), saat qurşağı yazılmayıbsa
+      const d = new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : raw + "+04:00");
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    const starts = parseDate(b.starts_at), ends = parseDate(b.ends_at);
+    if (!starts || !ends) return res.status(400).json({ ok: false, error: "Başlama və bitmə tarixi düzgün deyil." });
+    if (new Date(ends) <= new Date(starts)) return res.status(400).json({ ok: false, error: "Bitmə tarixi başlama tarixindən sonra olmalıdır." });
+    // Məhsul açarları: vergüllə ayrılmış siyahı. Boş = bütün məhsullar
+    const keys = String(Array.isArray(b.product_keys) ? b.product_keys.join(",") : (b.product_keys || ""))
+      .split(",").map(x => x.trim()).filter(Boolean).slice(0, 200);
+    // Müddətlər: 1,2,3,6,12-dən. Boş = bütün müddətlər
+    const months = (Array.isArray(b.months) ? b.months : []).map(x => parseInt(x, 10)).filter(x => [1, 2, 3, 6, 12].includes(x));
+    const active = !(b.active === false || b.active === "false");
+    const id = b.id ? parseInt(b.id, 10) : null;
+    if (id) {
+      const r = await pool.query(
+        `update scheduled_discounts set name = $2, percent = $3, product_keys = $4, months = $5,
+           starts_at = $6, ends_at = $7, active = $8 where id = $1 returning id`,
+        [id, name, percent, keys.length ? keys : null, months.length ? months : null, starts, ends, active]);
+      if (!r.rowCount) return res.status(404).json({ ok: false, error: "Endirim tapılmadı." });
+      return res.status(200).json({ ok: true, id: r.rows[0].id });
+    }
+    const r = await pool.query(
+      `insert into scheduled_discounts (name, percent, product_keys, months, starts_at, ends_at, active)
+       values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+      [name, percent, keys.length ? keys : null, months.length ? months : null, starts, ends, active]);
+    return res.status(200).json({ ok: true, id: r.rows[0].id });
+  }
+
+  if (req.method === "POST" && action === "discount_delete") {
+    await ensureDiscountTable(pool);
+    const r = await pool.query("delete from scheduled_discounts where id = $1 returning id", [parseInt(body(req).id, 10) || 0]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Endirim tapılmadı." });
     return res.status(200).json({ ok: true });
   }
 

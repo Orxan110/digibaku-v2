@@ -1,4 +1,5 @@
 const { pool } = require("./_db");
+const { activeDiscounts, unitPrice } = require("../lib/pricing");
 
 // /img/<id> -> admin tərəfindən yüklənmiş şəkil (vercel.json: /img/:id -> /api/products?img=:id)
 async function serveImage(req, res) {
@@ -64,17 +65,12 @@ module.exports = async function handler(req, res) {
        limit 12`
     );
 
+    const discounts = await activeDiscounts(pool);
     const products = prods.rows.map(r => {
       const prices = [];
       MONTHS.forEach(m => {
-        const base = Number(r[`price_${m}_month`]);
-        const sale = Number(r[`sale_${m}_price`]);
-        const saleOn = r[`sale_${m}_active`] === true && sale > 0;
-        if (saleOn && base > 0 && sale < base) {
-          prices.push({ months: m, price: Number(sale.toFixed(2)), old: Number(base.toFixed(2)) });
-        } else if (base > 0) {
-          prices.push({ months: m, price: Number(base.toFixed(2)), old: null });
-        }
+        const u = unitPrice(r, m, discounts);
+        if (u) prices.push({ months: m, price: u.price, old: u.old });
       });
       return {
         product_key: r.product_key,
