@@ -18,8 +18,9 @@ const HAS_PRICE = "greatest(coalesce(pp.price_1_month,0), coalesce(pp.price_2_mo
   "coalesce(pp.price_6_month,0), coalesce(pp.price_12_month,0)) > 0";
 
 function origin(req) {
-  if (process.env.SITE_URL) return String(process.env.SITE_URL).replace(/\/+$/, "");
-  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  // Yalnız www-suz kanonik domen: SITE_URL varsa o, yoxdursa sorğu host-u (www. silinir)
+  if (process.env.SITE_URL) return String(process.env.SITE_URL).trim().replace(/\/+$/, "").replace(/^(https?:\/\/)www\./i, "$1");
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim().replace(/^www\./i, "");
   return host ? "https://" + host : "";
 }
 function esc(s) {
