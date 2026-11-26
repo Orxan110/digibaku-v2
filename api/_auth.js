@@ -32,6 +32,12 @@ function ensureSecurity() {
       await pool.query(`create table if not exists admin_audit (
         id bigserial primary key, action text not null, detail text, ip text,
         created_at timestamptz not null default now())`);
+      // Köhnə strukturlu cədvəl varsa çatışmayan sütunlar əlavə olunur (jurnal boş qalmasın)
+      await pool.query("alter table admin_audit add column if not exists action text");
+      await pool.query("alter table admin_audit add column if not exists detail text");
+      await pool.query("alter table admin_audit add column if not exists ip text");
+      await pool.query("alter table admin_audit add column if not exists created_at timestamptz not null default now()");
+      await pool.query("alter table admin_audit add column if not exists id bigserial");
     })().catch(function (e) { secReady = null; throw e; });
   }
   return secReady;
