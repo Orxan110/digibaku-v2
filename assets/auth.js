@@ -125,7 +125,7 @@
       var email = String(opts.newEmail || "").trim();
       if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
       if (opts.currentEmail && email.toLowerCase() === String(opts.currentEmail).toLowerCase()) return { ok: false, error: msg("sameEmail") };
-      var r = await call("/change-email", { newEmail: email, callbackURL: location.origin + "/profile.html" });
+      var r = await call("/change-email", { newEmail: email, callbackURL: location.origin.replace(/^(https?:\/\/)www\./i, "$1") + "/profile.html" });
       if (!r.ok) return r;
       return { ok: true, message: msg("emailRequested") };
     },
@@ -142,7 +142,7 @@
       var email = opts.email;
       if (!validateEmail(email)) return { ok: false, error: msg("invalidEmail") };
       var r = await call("/request-password-reset", {
-        email: email.trim(), redirectTo: opts.redirectTo || (location.origin + "/login.html?reset=1")
+        email: email.trim(), redirectTo: opts.redirectTo || (location.origin.replace(/^(https?:\/\/)www\./i, "$1") + "/login.html?reset=1")
       });
       if (!r.ok) return r;
       return { ok: true, message: msg("resetSent") };

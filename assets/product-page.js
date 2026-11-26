@@ -139,10 +139,12 @@
     if (!el) { el = document.createElement("meta"); el.setAttribute(attr, name); document.head.appendChild(el); }
     el.setAttribute("content", content);
   }
+  // Paylaşım/canonical üçün həmişə www-suz domen
+  var SITE_ORIGIN = location.origin.replace(/^(https?:\/\/)www\./i, "$1");
   function absUrl(u) {
     if (!u) return "";
     if (/^https?:\/\//i.test(u)) return u;
-    return location.origin + (u.charAt(0) === "/" ? "" : "/") + u;
+    return SITE_ORIGIN + (u.charAt(0) === "/" ? "" : "/") + u;
   }
   function applySeo(p) {
     if (lang === "az" && document.getElementById("ssrSeo")) return; // server tərəfdən hazır SEO var
@@ -150,7 +152,7 @@
     var desc = ((p.description && (p.description[lang] || p.description.az)) || "").replace(/\s+/g, " ").trim();
     if (!desc) desc = name + " — DigiBaku. Sərfəli qiymət, sürətli çatdırılma.";
     if (desc.length > 160) desc = desc.slice(0, 157).replace(/\s+\S*$/, "") + "...";
-    var url = location.origin + "/product?slug=" + encodeURIComponent(slug);
+    var url = SITE_ORIGIN + "/product?slug=" + encodeURIComponent(slug);
     var link = document.head.querySelector('link[rel="canonical"]');
     if (!link) { link = document.createElement("link"); link.setAttribute("rel", "canonical"); document.head.appendChild(link); }
     link.setAttribute("href", url);

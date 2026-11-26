@@ -491,16 +491,16 @@
     }
     if(kw) setMeta("name", "keywords", kw);
     if(s.og_image){
-      var img = s.og_image.charAt(0) === "/" ? location.origin + s.og_image : s.og_image;
+      var img = s.og_image.charAt(0) === "/" ? location.origin.replace(/^(https?:\/\/)www\./i, "$1") + s.og_image : s.og_image;
       setMeta("property", "og:image", img);
       setMeta("name", "twitter:image", img);
     }
     setMeta("property", "og:type", "website");
-    setMeta("property", "og:url", location.origin + location.pathname);
+    setMeta("property", "og:url", location.origin.replace(/^(https?:\/\/)www\./i, "$1") + location.pathname);
     setMeta("name", "twitter:card", s.og_image ? "summary_large_image" : "summary");
     var link = document.head.querySelector('link[rel="canonical"]');
     if(!link){ link = document.createElement("link"); link.setAttribute("rel", "canonical"); document.head.appendChild(link); }
-    link.setAttribute("href", location.origin + location.pathname);
+    link.setAttribute("href", location.origin.replace(/^(https?:\/\/)www\./i, "$1") + location.pathname);
   }
 
   function loadSettings(){
