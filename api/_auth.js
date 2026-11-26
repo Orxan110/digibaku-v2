@@ -32,16 +32,44 @@ function ensureSecurity() {
       await pool.query(`create table if not exists admin_audit (
         id bigserial primary key, action text not null, detail text, ip text,
         created_at timestamptz not null default now())`);
-      // Köhnə strukturlu cədvəl varsa çatışmayan sütunlar əlavə olunur (jurnal boş qalmasın)
-      await pool.query("alter table admin_audit add column if not exists action text");
-      await pool.query("alter table admin_audit add column if not exists detail text");
-      await pool.query("alter table admin_audit add column if not exists ip text");
-      await pool.query("alter table admin_audit add column if not exists created_at timestamptz not null default now()");
-      await pool.query("alter table admin_audit add column if not exists id bigserial");
+      await fixAuditTable();
     })().catch(function (e) { secReady = null; throw e; });
   }
   return secReady;
 }
+
+// Köhnə/uyğunsuz strukturlu admin_audit cədvəli yazmanı səssizcə pozurdu (jurnal boş qalırdı).
+// Sınaq yazısı tranzaksiyada edilir və geri alınır; alınmasa köhnə cədvəl kənara qoyulur, yenisi yaradılır.
+async function fixAuditTable() {
+  const c = await pool.connect();
+  try {
+    let ok = true;
+    try {
+      await c.query("begin");
+      await c.query("insert into admin_audit (action, detail, ip) values ('__test__', null, '0.0.0.0')");
+    } catch (e) {
+      ok = false;
+      lastAuditError = "Köhnə jurnal cədvəli uyğunsuz idi: " + String(e && e.message || e).slice(0, 160);
+    } finally {
+      await c.query("rollback").catch(function () {});
+    }
+    if (!ok) {
+      const old = "admin_audit_old_" + Date.now();
+      await c.query("alter table admin_audit rename to " + old);
+      // köhnə cədvəlin id sırası (sequence) adı toqquşmasın
+      await c.query("alter sequence if exists admin_audit_id_seq rename to " + old + "_id_seq").catch(function () {});
+      await c.query(`create table admin_audit (
+        id bigserial primary key, action text not null, detail text, ip text,
+        created_at timestamptz not null default now())`);
+      console.error("admin_audit yenidən yaradıldı, köhnəsi: " + old);
+    }
+  } finally {
+    c.release();
+  }
+}
+
+let lastAuditError = "";
+function auditError() { return lastAuditError; }
 
 // Sabit pəncərəli limit. true = icazə var, false = limit aşılıb.
 // Baza xətası olarsa sayt dayanmasın deyə icazə verir.
@@ -71,8 +99,11 @@ async function audit(action, detail, ip) {
     await ensureSecurity();
     await pool.query("insert into admin_audit (action, detail, ip) values ($1, $2, $3)",
       [String(action).slice(0, 60), detail ? String(detail).slice(0, 300) : null, ip || null]);
+    lastAuditError = "";
   } catch (e) {
     console.error("audit:", e);
+    lastAuditError = String(e && e.message || e).slice(0, 200);
+    secReady = null; // növbəti çağırışda cədvəl yenidən yoxlansın
   }
 }
 
@@ -108,4 +139,4 @@ function sameOrigin(req) {
   try { return new URL(src).host.toLowerCase() === host; } catch (e) { return false; }
 }
 
-module.exports = { sameOrigin, verify, clientIp, rateLimit, audit, ensureSecurity, safeUrl, requireAdmin };
+module.exports = { sameOrigin, verify, clientIp, rateLimit, audit, auditError, ensureSecurity, safeUrl, requireAdmin };
