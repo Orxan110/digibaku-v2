@@ -1,4 +1,4 @@
-const { pool, getUser, ensureSchema, NEON_BASE, upstreamOrigin } = require("./_db");
+const { pool, getUser, ensureSchema, NEON_BASE, upstreamOrigin, FALLBACK_ORIGIN } = require("./_db");
 const { rateLimit, clientIp, sameOrigin } = require("./_auth");
 
 function body(req) {
@@ -70,14 +70,21 @@ async function authProxy(req, res) {
     if (payload.length > 10000) return res.status(413).json({ message: "Too large" });
   }
 
-  let up;
+  let up, text;
   try {
     up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual", signal: AbortSignal.timeout(15000) });
+    text = await up.text();
+    // "Invalid origin" (403): domen Neon Auth-da trusted deyil -> trusted ehtiyat origin ilə təkrar
+    if (up.status === 403 && /invalid origin/i.test(text) && h.Origin !== FALLBACK_ORIGIN) {
+      console.warn("auth proxy: Invalid origin for", h.Origin, "- retry with fallback");
+      h.Origin = FALLBACK_ORIGIN;
+      up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual", signal: AbortSignal.timeout(15000) });
+      text = await up.text();
+    }
   } catch (e) {
     console.error("auth proxy:", e);
     return res.status(502).json({ message: "Auth serveri ilə əlaqə yoxdur." });
   }
-  const text = await up.text();
   const sc = up.headers.getSetCookie ? up.headers.getSetCookie() : [];
   if (sc.length) res.setHeader("Set-Cookie", sc.map(fixCookie));
   const ct = up.headers.get("content-type");
