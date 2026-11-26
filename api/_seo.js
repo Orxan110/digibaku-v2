@@ -180,7 +180,7 @@ async function productPage(req, res) {
   desc = cut(desc, 160);
   let kw = String(p.seo.keywords_az || "").trim();
   if (!kw) kw = [name, name + " al", name + " qiymət", name + " Azərbaycan", name + " Bakı", name + " premium"].join(", ");
-  const img = abs(o, p.image_url);
+  const img = abs(o, p.image_url) || (o + "/assets/og-image.jpg");
 
   const product = {
     "@context": "https://schema.org", "@type": "Product", name: name, description: desc, url: url,
