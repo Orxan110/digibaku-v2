@@ -1,5 +1,5 @@
 const { pool, getUserId } = require("./_db");
-const { rateLimit } = require("./_auth");
+const { rateLimit, sameOrigin } = require("./_auth");
 
 const MONTHS = [1, 2, 3, 6, 12];
 
@@ -33,6 +33,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
+      if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: "Forbidden" });
       // Spam sifarişlərə qarşı: istifadəçi başına saatda 10 sifariş
       if (!(await rateLimit("order:" + userId, 10, 3600))) {
         return res.status(429).json({ ok: false, error: "Çox sayda sifariş göndərdiniz. Bir az sonra yenidən cəhd edin." });

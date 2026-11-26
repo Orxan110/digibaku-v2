@@ -130,10 +130,13 @@ async function adminActive(threadId) {
   return r.rowCount > 0;
 }
 
-async function runBot(threadId, text, lang) {
+async function runBot(threadId, text, lang, ip) {
   if (await adminActive(threadId)) return null;
+  // Süni intellekt xərcinin sui-istifadəsinə qarşı: IP üzrə saatda 30, ümumi gündə 1500 cavab.
+  // Limit aşılsa pulsuz qayda əsaslı bot cavab verir.
+  const aiOk = (await rateLimit("ai:ip:" + ip, 30, 3600)) && (await rateLimit("ai:day", 1500, 86400));
   // 1) Claude ilə sərbəst söhbət; 2) açar yoxdursa / xəta olarsa qayda əsaslı bot
-  let answer = await aiReply(pool, threadId, text, lang);
+  let answer = aiOk ? await aiReply(pool, threadId, text, lang) : null;
   if (!answer) {
     answer = await botReply(pool, text, lang);
     const prev = await pool.query("select 1 from chat_messages where thread_id = $1 and is_bot = true limit 1", [threadId]);
@@ -180,7 +183,7 @@ async function handler(req, res) {
         [thread.id]);
       let bot = null;
       try {
-        if (await ensureBot()) bot = await runBot(thread.id, text, txt(b.lang, 5));
+        if (await ensureBot()) bot = await runBot(thread.id, text, txt(b.lang, 5), clientIp(req));
       } catch (e) {
         console.error("bot:", e);
       }

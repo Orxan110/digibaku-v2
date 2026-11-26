@@ -92,4 +92,14 @@ function requireAdmin(req, res) {
   return p;
 }
 
-module.exports = { verify, clientIp, rateLimit, audit, ensureSecurity, safeUrl, requireAdmin };
+// CSRF qorunması: cookie ilə təsdiqlənən dəyişdirici sorğu yalnız öz saytımızdan gələ bilər.
+// Origin (yoxdursa Referer) varsa host ilə üst-üstə düşməlidir.
+function sameOrigin(req) {
+  const h = req.headers || {};
+  const host = String(h["x-forwarded-host"] || h.host || "").split(",")[0].trim().toLowerCase();
+  const src = h.origin || h.referer;
+  if (!src) return true;
+  try { return new URL(src).host.toLowerCase() === host; } catch (e) { return false; }
+}
+
+module.exports = { sameOrigin, verify, clientIp, rateLimit, audit, ensureSecurity, safeUrl, requireAdmin };

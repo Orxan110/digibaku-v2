@@ -1,5 +1,5 @@
 const { pool, getUser, ensureSchema, NEON_BASE } = require("./_db");
-const { rateLimit, clientIp } = require("./_auth");
+const { rateLimit, clientIp, sameOrigin } = require("./_auth");
 
 function body(req) {
   if (!req.body) return {};
@@ -7,8 +7,14 @@ function body(req) {
   return req.body;
 }
 
+// Neon-un cookie-sini saytın öz domeninə bağlayır və təhlükəsizlik bayraqlarını məcburi edir
 function fixCookie(c) {
-  return c.replace(/;\s*Domain=[^;]*/ig, "");
+  let s = c.replace(/;\s*Domain=[^;]*/ig, "");
+  if (!/;\s*Secure(;|$)/i.test(s)) s += "; Secure";
+  if (!/;\s*HttpOnly(;|$)/i.test(s)) s += "; HttpOnly";
+  if (!/;\s*SameSite=/i.test(s)) s += "; SameSite=Lax";
+  if (!/;\s*Path=/i.test(s)) s += "; Path=/";
+  return s;
 }
 
 // Yalnız saytın istifadə etdiyi (və təhlükəsiz) auth ünvanlarına icazə verilir
@@ -113,6 +119,7 @@ async function extra(req, res) {
 async function review(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: "Forbidden" });
   const user = await getUser(req);
   if (!user) return res.status(401).json({ ok: false, error: "Rəy yazmaq üçün daxil olun." });
   if (!(await rateLimit("review:" + user.id, 5, 3600))) return res.status(429).json({ ok: false, error: "Çox tez-tez göndərirsiniz. Bir az gözləyin." });
