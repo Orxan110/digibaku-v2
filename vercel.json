@@ -1,18 +1,5 @@
 {
   "cleanUrls": true,
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.digibaku.com"
-        }
-      ],
-      "destination": "https://digibaku.com/$1",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     {
       "source": "/img/:id",
