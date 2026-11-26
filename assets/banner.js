@@ -19,7 +19,7 @@
       if (s && pick(b, "subtitle")) s.textContent = pick(b, "subtitle");
       if (btn) {
         if (pick(b, "cta_label")) btn.textContent = pick(b, "cta_label");
-        if (b.cta_url) btn.setAttribute("href", b.cta_url);
+        if (b.cta_url && /^(\/|#|https:\/\/|[a-z0-9_-]+\.html)/i.test(String(b.cta_url).trim())) btn.setAttribute("href", String(b.cta_url).trim());
       }
       if (b.image_url) {
         box.style.backgroundImage = "linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.85)),url('" +
