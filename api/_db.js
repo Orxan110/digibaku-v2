@@ -40,6 +40,9 @@ async function sessionUser(token) {
   }
 }
 
+// Neon Auth panelində trusted olan ehtiyat origin ("Invalid origin" xətasının qarşısını alır)
+const FALLBACK_ORIGIN = "https://digibaku-v2.vercel.app";
+
 // Neon Auth-a göndərilən Origin. NEON_AUTH_ORIGIN təyin olunsa, həmişə o göndərilir.
 function upstreamOrigin(req) {
   const forced = String(process.env.NEON_AUTH_ORIGIN || "").trim().replace(/\/+$/, "");
@@ -117,4 +120,4 @@ async function ensureSchema() {
   return globalThis.digibakuSchema;
 }
 
-module.exports = { pool, getUser, getUserId, ensureSchema, NEON_BASE, upstreamOrigin };
+module.exports = { pool, getUser, getUserId, ensureSchema, NEON_BASE, upstreamOrigin, FALLBACK_ORIGIN };
