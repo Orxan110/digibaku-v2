@@ -145,6 +145,7 @@
     return location.origin + (u.charAt(0) === "/" ? "" : "/") + u;
   }
   function applySeo(p) {
+    if (lang === "az" && document.getElementById("ssrSeo")) return; // server tərəfdən hazır SEO var
     var name = nameOf(p);
     var desc = ((p.description && (p.description[lang] || p.description.az)) || "").replace(/\s+/g, " ").trim();
     if (!desc) desc = name + " — DigiBaku. Sərfəli qiymət, sürətli çatdırılma.";
@@ -251,7 +252,7 @@
           bar.style.display = "none";
           return;
         }
-        document.title = nameOf(p) + " — DigiBaku";
+        if (lang !== "az" || !document.getElementById("ssrSeo")) document.title = nameOf(p) + " — DigiBaku";
         state.product = p;
         if (window.DB) DB.currentProduct = p;
         if (!pick(p, state.months)) state.months = sorted(p)[0].months;
