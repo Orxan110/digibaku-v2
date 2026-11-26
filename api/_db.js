@@ -9,7 +9,8 @@ const pool = globalThis.digibakuPool || new Pool({
 });
 globalThis.digibakuPool = pool;
 
-const NEON_BASE = "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth";
+// Vercel-də NEON_AUTH_URL təyin olunubsa o istifadə olunur, yoxsa default
+const NEON_BASE = String(process.env.NEON_AUTH_URL || "https://ep-lively-math-betoma1f.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth").trim().replace(/\/+$/, "");
 const JWKS_URL = NEON_BASE + "/.well-known/jwks.json";
 let jwksCache = null;
 
@@ -39,16 +40,23 @@ async function sessionUser(token) {
   }
 }
 
-// 3) Cookie ilə yoxlanış: token alına bilmədikdə sessiya cookie-si ilə (eyni domen, /api/auth proxy)
+// Neon Auth-a göndərilən Origin. NEON_AUTH_ORIGIN təyin olunsa, həmişə o göndərilir.
+function upstreamOrigin(req) {
+  const forced = String(process.env.NEON_AUTH_ORIGIN || "").trim().replace(/\/+$/, "");
+  if (forced) return forced;
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  return req.headers.origin || ("https://" + host);
+}
+
+// 3) Cookie ilə yoxlanış
 async function cookieUser(req) {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
   try {
     const r = await fetch(NEON_BASE + "/get-session", {
       headers: {
         Cookie: cookie,
-        Origin: req.headers.origin || ("https://" + host),
+        Origin: upstreamOrigin(req),
         Accept: "application/json"
       }
     });
@@ -76,7 +84,6 @@ async function bearerUser(token) {
 }
 
 // İstifadəçi: { id, name, email } və ya null
-// Əvvəl Bearer token, alınmadısa (və ya yararsızdırsa) sessiya cookie-si yoxlanılır.
 async function getUser(req) {
   const h = req.headers.authorization || "";
   const m = h.match(/^Bearer\s+(.+)$/);
@@ -110,4 +117,4 @@ async function ensureSchema() {
   return globalThis.digibakuSchema;
 }
 
-module.exports = { pool, getUser, getUserId, ensureSchema, NEON_BASE };
+module.exports = { pool, getUser, getUserId, ensureSchema, NEON_BASE, upstreamOrigin };
