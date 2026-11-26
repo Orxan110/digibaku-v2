@@ -1,4 +1,5 @@
 const { pool, getUser, ensureSchema, NEON_BASE } = require("./_db");
+const { rateLimit, clientIp } = require("./_auth");
 
 function body(req) {
   if (!req.body) return {};
@@ -10,12 +11,65 @@ function fixCookie(c) {
   return c.replace(/;\s*Domain=[^;]*/ig, "");
 }
 
+// Yalnız saytın istifadə etdiyi (və təhlükəsiz) auth ünvanlarına icazə verilir
+const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email)$/;
+
 async function authProxy(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const path = String(req.query.p || "").replace(/^\/+/, "");
-  if (!/^[A-Za-z0-9\-_.\/]*$/.test(path) || path.indexOf("..") >= 0) {
-    return res.status(400).json({ error: "Bad path" });
+  const path = String(req.query.p || "").replace(/^\/+|\/+$/g, "");
+  if (!AUTH_ALLOW.test(path)) {
+    return res.status(404).json({ message: "Not found" });
   }
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+
+  // CSRF: dəyişdirən sorğuda Origin varsa, yalnız öz saytımızdan olmalıdır
+  if (req.method !== "GET" && req.method !== "HEAD" && req.headers.origin) {
+    let oh = "";
+    try { oh = new URL(req.headers.origin).host; } catch (e) {}
+    if (oh !== host) return res.status(403).json({ message: "Forbidden" });
+  }
+
+  // Brute-force / spam qeydiyyat limiti (IP üzrə)
+  const ip = clientIp(req);
+  if (req.method === "POST") {
+    let ok = true;
+    if (path === "sign-in/email") ok = await rateLimit("auth-in:" + ip, 10, 600);
+    else if (path === "sign-up/email") ok = await rateLimit("auth-up:" + ip, 5, 3600);
+    else if (/password|verif/.test(path)) ok = await rateLimit("auth-pw:" + ip, 5, 3600);
+    if (!ok) return res.status(429).json({ message: "Çox cəhd edildi. Bir az sonra yenidən yoxlayın." });
+  }
+
+  const qs = new URLSearchParams();
+  Object.keys(req.query || {}).forEach(function (k) {
+    if (k === "p" || k === "action") return;
+    [].concat(req.query[k]).forEach(function (v) { qs.append(k, v); });
+  });
+  const url = NEON_BASE + "/" + path + (qs.toString() ? "?" + qs.toString() : "");
+
+  const h = { Accept: "application/json", Origin: req.headers.origin || ("https://" + host) };
+  if (req.headers.cookie) h.Cookie = req.headers.cookie;
+  if (req.headers.authorization) h.Authorization = req.headers.authorization;
+  let payload;
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    h["Content-Type"] = "application/json";
+    payload = typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
+    if (payload.length > 10000) return res.status(413).json({ message: "Too large" });
+  }
+
+  let up;
+  try {
+    up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual" });
+  } catch (e) {
+    console.error("auth proxy:", e);
+    return res.status(502).json({ message: "Auth serveri ilə əlaqə yoxdur." });
+  }
+  const text = await up.text();
+  const sc = up.headers.getSetCookie ? up.headers.getSetCookie() : [];
+  if (sc.length) res.setHeader("Set-Cookie", sc.map(fixCookie));
+  const ct = up.headers.get("content-type");
+  if (ct) res.setHeader("Content-Type", ct);
+  return res.status(up.status).send(text);
+}
   const qs = new URLSearchParams();
   Object.keys(req.query || {}).forEach(function (k) {
     if (k === "p" || k === "action") return;
