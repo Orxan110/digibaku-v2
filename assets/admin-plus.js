@@ -97,7 +97,7 @@
     function preview() {
       var t = f("title_az").value || suggestTitle(p);
       var d = f("desc_az").value || suggestDesc(p);
-      list.querySelector("#pvUrl").textContent = location.host + " › product";
+      list.querySelector("#pvUrl").textContent = "digibaku.com › product";
       list.querySelector("#pvT").textContent = t.slice(0, 65);
       list.querySelector("#pvD").textContent = d.slice(0, 160);
       list.querySelector('[data-c="t"]').innerHTML = lenBadge(f("title_az").value.length, 30, 65) + "/65";
