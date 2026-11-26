@@ -140,7 +140,8 @@
     if (a.status === 401) { expired(); return; }
     var b = await api(PATH + "audit_list");
     var checks = (a.data && a.data.checks) || [];
-    var rows = (b.data && b.data.rows) || [];
+    var rows = (b.ok && b.data && b.data.rows) || [];
+    var auditErr = b.ok ? "" : fetchErr(b, "Jurnal yüklənmədi.");
     list.innerHTML =
       '<div class="card-box" style="margin-bottom:12px"><b>Təhlükəsizlik yoxlaması</b>' +
       checks.map(function (c) {
@@ -153,7 +154,7 @@
         rows.map(function (r) {
           return '<tr style="border-top:1px solid #262626"><td>' + esc(fmt(r.created_at)) + "</td><td>" + esc(r.action) +
             "</td><td>" + esc(r.detail || "") + "</td><td>" + esc(r.ip || "") + "</td></tr>";
-        }).join("") + "</table></div>" : '<div class="muted" style="margin-top:8px">Hələ qeyd yoxdur.</div>') + "</div>";
+        }).join("") + "</table></div>" : '<div class="muted" style="margin-top:8px">' + (auditErr ? "⚠️ " + esc(auditErr) : "Hələ qeyd yoxdur.") + "</div>") + "</div>";
   }
 
   nav.addEventListener("click", function (e) {
