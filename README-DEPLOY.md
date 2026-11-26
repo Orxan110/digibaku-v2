@@ -47,3 +47,12 @@ Neon Auth panelində trusted origin: https://digibaku-v2.vercel.app
 - Sessiya cookie-si Neon Auth domenindən gəlir, API isə digibaku.com domenindədir. Brauzer cookie-ni API-yə göndərməyə bilər. Bu zaman sifariş 401 verəcək. Həll: Neon Auth panelində saytın domeni trusted origin kimi əlavə olunmalı və ya auth proxy qurulmalıdır. Bu, test zamanı ilk yoxlanmalı olan məqamdır.
 - Sifarişlər yalnız sahib (neondb_owner) rolu ilə yazılır. RLS siyasətləri (orders, profiles üçün) hələ yazılmayıb, bu səbəbdən növbəti mərhələdə əlavə olunmalıdır.
 - site_products.product_key ilə product_prices.product_key-in eyni dəyərləri daşıdığı fərz edilir.
+
+## TƏHLÜKƏSİZLİK (v5) — Vercel Environment Variables (MÜTLƏQ)
+- ADMIN_EMAIL     — admin e-poçtu (kodda artıq default yoxdur; təyin olunmasa admin girişi işləmir)
+- ADMIN_PASSWORD  — 14+ simvol, hərf+rəqəm+simvol
+- ADMIN_SECRET    — 40+ təsadüfi simvol (32-dən qısa olarsa giriş bloklanır). Dəyişəndə bütün admin sessiyaları bağlanır.
+- SITE_URL        — https://digibaku.com
+- DATABASE_URL    — Neon string
+- ANTHROPIC_API_KEY / GEMINI_API_KEY — yalnız Vercel-də, heç vaxt GitHub-da
+Dəyişikliklərdən sonra Redeploy edin. Köhnə şifrə/secret GitHub tarixçəsində qalıbsa, onları mütləq yeniləyin.
