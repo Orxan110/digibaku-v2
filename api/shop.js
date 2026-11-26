@@ -70,39 +70,6 @@ async function authProxy(req, res) {
   if (ct) res.setHeader("Content-Type", ct);
   return res.status(up.status).send(text);
 }
-  const qs = new URLSearchParams();
-  Object.keys(req.query || {}).forEach(function (k) {
-    if (k === "p" || k === "action") return;
-    [].concat(req.query[k]).forEach(function (v) { qs.append(k, v); });
-  });
-  const url = NEON_BASE + "/" + path + (qs.toString() ? "?" + qs.toString() : "");
-
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  const h = { Accept: "application/json", Origin: req.headers.origin || ("https://" + host) };
-  if (req.headers.cookie) h.Cookie = req.headers.cookie;
-  if (req.headers.authorization) h.Authorization = req.headers.authorization;
-  let payload;
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    h["Content-Type"] = "application/json";
-    payload = typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
-  }
-
-  let up;
-  try {
-    up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual" });
-  } catch (e) {
-    console.error("auth proxy:", e);
-    return res.status(502).json({ message: "Auth serveri ilə əlaqə yoxdur." });
-  }
-  const text = await up.text();
-  const sc = up.headers.getSetCookie ? up.headers.getSetCookie() : [];
-  if (sc.length) res.setHeader("Set-Cookie", sc.map(fixCookie));
-  const loc = up.headers.get("location");
-  if (loc) res.setHeader("Location", loc);
-  const ct = up.headers.get("content-type");
-  if (ct) res.setHeader("Content-Type", ct);
-  return res.status(up.status).send(text);
-}
 
 async function findProduct(key) {
   const r = await pool.query(
@@ -147,6 +114,7 @@ async function review(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
   const user = await getUser(req);
   if (!user) return res.status(401).json({ ok: false, error: "Rəy yazmaq üçün daxil olun." });
+  if (!(await rateLimit("review:" + user.id, 5, 3600))) return res.status(429).json({ ok: false, error: "Çox tez-tez göndərirsiniz. Bir az gözləyin." });
   const b = body(req);
   const text = String(b.body || "").trim();
   const rating = parseInt(b.rating, 10);
