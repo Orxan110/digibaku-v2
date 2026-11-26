@@ -1,5 +1,5 @@
 const { pool } = require("./_db");
-const { verify } = require("./_auth");
+const { verify, clientIp, audit, ensureSecurity } = require("./_auth");
 
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
@@ -84,6 +84,7 @@ module.exports = async function handler(req, res) {
     const wico = String(b.wa_icon == null ? "" : b.wa_icon).trim();
     next.wa_icon = (wico.length <= 90000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(wico)) ? wico : "";
     await putVal("general", next);
+    audit("settings_save", "general", clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -104,6 +105,7 @@ module.exports = async function handler(req, res) {
       next["body_" + l] = clean(b["body_" + l], 20000);
     });
     await putVal("page_" + key, next);
+    audit("page_save", key, clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -130,7 +132,62 @@ module.exports = async function handler(req, res) {
     const all = (await getVal("seo")) || {};
     all[key] = next;
     await putVal("seo", all);
+    audit("seo_save", key, clientIp(req));
     return res.status(200).json({ ok: true });
+  }
+
+
+  // ---------- Məhsul üzrə SEO ----------
+  if (req.method === "GET" && action === "product_seo_get") {
+    const r = await pool.query(
+      `select coalesce(p.slug, p.product_key) as slug, p.name_az, p.description_az, p.image_url, p.active,
+              (greatest(coalesce(pp.price_1_month,0), coalesce(pp.price_2_month,0), coalesce(pp.price_3_month,0),
+                        coalesce(pp.price_6_month,0), coalesce(pp.price_12_month,0)) > 0) as has_price
+       from site_products p left join product_prices pp on pp.product_key = p.product_key
+       where p.deleted_at is null order by p.sort_order, p.name_az`).catch(async function () {
+      return pool.query(
+        `select coalesce(p.slug, p.product_key) as slug, p.name_az, p.description_az, p.image_url, p.active, true as has_price
+         from site_products p order by p.sort_order, p.name_az`);
+    });
+    return res.status(200).json({ ok: true, products: r.rows, seo: (await getVal("product_seo")) || {} });
+  }
+
+  if (req.method === "POST" && action === "product_seo_save") {
+    const b = body(req);
+    const slug = String(b.slug || "").trim();
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(slug)) return res.status(400).json({ ok: false, error: "Məhsul yanlışdır." });
+    const ex = await pool.query("select 1 from site_products where slug = $1 or product_key = $1", [slug]);
+    if (!ex.rowCount) return res.status(404).json({ ok: false, error: "Məhsul tapılmadı." });
+    const all = (await getVal("product_seo")) || {};
+    const next = {
+      title_az: clean(b.title_az, 90), desc_az: clean(b.desc_az, 320), keywords_az: clean(b.keywords_az, 300)
+    };
+    if (!next.title_az && !next.desc_az && !next.keywords_az) delete all[slug]; else all[slug] = next;
+    await putVal("product_seo", all);
+    audit("product_seo_save", slug, clientIp(req));
+    return res.status(200).json({ ok: true });
+  }
+
+  // ---------- Təhlükəsizlik: jurnal və vəziyyət ----------
+  if (req.method === "GET" && action === "audit_list") {
+    await ensureSecurity();
+    const r = await pool.query("select id, action, detail, ip, created_at from admin_audit order by id desc limit 200");
+    return res.status(200).json({ ok: true, rows: r.rows });
+  }
+
+  if (req.method === "GET" && action === "security_status") {
+    const secret = process.env.ADMIN_SECRET || "";
+    const pass = process.env.ADMIN_PASSWORD || "";
+    return res.status(200).json({
+      ok: true,
+      checks: [
+        { ok: secret.length >= 32, label: "ADMIN_SECRET uzunluğu 32+ simvol", fix: "Vercel → Environment Variables: ADMIN_SECRET-i 40+ təsadüfi simvolla əvəz edin." },
+        { ok: pass.length >= 12, label: "ADMIN_PASSWORD 12+ simvol", fix: "Daha uzun şifrə seçin (hərf+rəqəm+simvol)." },
+        { ok: !!process.env.ADMIN_EMAIL, label: "ADMIN_EMAIL Vercel-də təyin olunub", fix: "ADMIN_EMAIL dəyişənini əlavə edin (kodda default e-poçt qalmasın)." },
+        { ok: !!process.env.SITE_URL, label: "SITE_URL təyin olunub (sitemap/canonical üçün)", fix: "SITE_URL = https://digibaku.com (öz domeniniz) əlavə edin." },
+        { ok: !!process.env.DATABASE_URL, label: "DATABASE_URL təyin olunub", fix: "Neon connection string əlavə edin." }
+      ]
+    });
   }
 
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
