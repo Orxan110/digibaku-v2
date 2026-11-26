@@ -183,9 +183,14 @@ async function inner(req, res) {
 
   // ---------- Təhlükəsizlik: jurnal və vəziyyət ----------
   if (req.method === "GET" && action === "audit_list") {
-    await ensureSecurity();
-    const r = await pool.query("select id, action, detail, ip, created_at from admin_audit order by id desc limit 200");
-    return res.status(200).json({ ok: true, rows: r.rows });
+    try {
+      await ensureSecurity();
+      const r = await pool.query("select id, action, detail, ip, created_at from admin_audit order by created_at desc, id desc limit 200");
+      return res.status(200).json({ ok: true, rows: r.rows });
+    } catch (e) {
+      console.error("audit_list:", e);
+      return res.status(500).json({ ok: false, error: "Jurnal oxunmadı: " + String(e && e.message || e).slice(0, 160) });
+    }
   }
 
   if (req.method === "GET" && action === "security_status") {
