@@ -11,6 +11,31 @@ function txt(v) {
   return s ? s : null;
 }
 
+// Admin əl ilə yazdığı linkləri təhlükəsiz formaya gətirir (javascript:, data: və s. yenə də rədd olunur).
+function normImg(v) {
+  if (!v) return v;
+  let s = v;
+  if (/^http:\/\//i.test(s)) s = "https://" + s.slice(7);      // http -> https (qarışıq məzmun olmasın)
+  else if (/^\/\//.test(s)) s = "https:" + s;                    // //cdn.site/a.jpg
+  else if (/^(www\.)/i.test(s)) s = "https://" + s;              // www.site.com/a.jpg
+  else if (/^(assets|api)\//i.test(s)) s = "/" + s;              // assets/img/a.webp
+  return s;
+}
+function normCta(v) {
+  if (!v) return v;
+  let s = v;
+  if (/^http:\/\//i.test(s)) s = "https://" + s.slice(7);
+  else if (/^\/\//.test(s)) s = "https:" + s;
+  else if (/^www\./i.test(s)) s = "https://" + s;
+  return s;
+}
+function okCta(s) {
+  if (safeUrl(s) !== false) return true;                         // /yol və ya https://...
+  if (/[\s"'<>\\]/.test(s) || s.length > 500) return false;
+  // products.html, products.html?cat=x#y, product?slug=x, #bolme
+  return /^(#[A-Za-z0-9_-]+|[a-z0-9_-]+(\.html)?(\?[A-Za-z0-9=&%_.,-]*)?(#[A-Za-z0-9_-]*)?)$/i.test(s);
+}
+
 async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -28,16 +53,18 @@ async function inner(req, res) {
     const b = body(req);
     const titleAz = txt(b.title_az);
     if (!titleAz) return res.status(400).json({ ok: false, error: "Azərbaycanca başlıq daxil edin." });
-    const ctaUrl = txt(b.cta_url), imgUrl = txt(b.image_url);
-    if ((ctaUrl && safeUrl(ctaUrl) === false && !/^[a-z0-9_-]+\.html(\?[A-Za-z0-9=&%_-]*)?$/i.test(ctaUrl)) ||
-        (imgUrl && safeUrl(imgUrl) === false)) {
-      return res.status(400).json({ ok: false, error: "Link / və ya https:// ilə başlamalıdır." });
+    const ctaUrl = normCta(txt(b.cta_url)), imgUrl = normImg(txt(b.image_url));
+    if (ctaUrl && !okCta(ctaUrl)) {
+      return res.status(400).json({ ok: false, error: "Düymə linki yanlışdır. Nümunə: products.html, /products.html?cat=x, #bolme və ya https://... (boşluq və dırnaq olmamalıdır)." });
+    }
+    if (imgUrl && safeUrl(imgUrl) === false) {
+      return res.status(400).json({ ok: false, error: "Şəkil linki yanlışdır. Şəkli “Şəkil seç” düyməsi ilə yükləyin və ya / ya da https:// ilə başlayan link yazın (boşluq olmamalıdır)." });
     }
     const vals = [
       titleAz, txt(b.title_ru), txt(b.title_en),
       txt(b.subtitle_az), txt(b.subtitle_ru), txt(b.subtitle_en),
       txt(b.cta_label_az), txt(b.cta_label_ru), txt(b.cta_label_en),
-      txt(b.cta_url), txt(b.image_url),
+      ctaUrl, imgUrl,
       parseInt(b.sort_order, 10) || 0, !!b.active
     ];
     if (b.id) {
