@@ -83,7 +83,7 @@
       show("p", res);
       if (res.ok) { ["pCur", "pNew", "pRep"].forEach(function (id) { document.getElementById(id).value = ""; }); }
     };
-    document.getElementById("logoutBtn").onclick = async function () { await DigiAuth.logout(); location.href = "index.html"; };
+    document.getElementById("logoutBtn").onclick = async function () { await DigiAuth.logout(); location.replace("index.html"); };
   }
   draw();
 })();

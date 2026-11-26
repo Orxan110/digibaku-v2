@@ -45,6 +45,7 @@
       res = await fetch(AUTH_BASE + path, {
         method: method || "POST",
         credentials: "include",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined
       });
@@ -87,12 +88,23 @@
     },
     async logout() {
       try { localStorage.removeItem("digibaku_authhint"); } catch (e) {}
+      // 1-ci cəhd; server cookie-ləri özü silir. Xəta olsa bir dəfə də təkrarlanır.
       var r = await call("/sign-out", {});
-      return r.ok ? { ok: true, message: msg("loggedOut") } : r;
+      if (!r.ok) r = await call("/sign-out", {});
+      try { document.cookie = "digibaku_auth=; Path=/; Max-Age=0; Secure; SameSite=Lax"; } catch (e) {}
+      // Həqiqətən çıxılıb-çıxılmadığını yoxla
+      var s = await DigiAuth.getSession();
+      if (s.ok && s.session) return { ok: false, error: msg("genericError") };
+      return { ok: true, message: msg("loggedOut") };
     },
     async getSession() {
+      // ok:false = server/şəbəkə xətası (sessiyanın olub-olmadığı bəlli deyil), ok:true,session:null = daxil olmayıb
       var r = await call("/get-session", null, "GET");
-      if (!r.ok || !r.data || !r.data.user) return { ok: true, session: null };
+      if (!r.ok) {
+        if (r.status && r.status < 500) return { ok: true, session: null };
+        return { ok: false, session: null, error: r.error };
+      }
+      if (!r.data || !r.data.user) return { ok: true, session: null };
       return { ok: true, session: r.data };
     },
     async getToken() {
