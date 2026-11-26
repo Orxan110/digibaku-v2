@@ -62,7 +62,7 @@ async function priceCart(input) {
   }
   const keys = [...new Set(input.map(i => String((i && i.product_key) || "").slice(0, 100)))];
   const rows = await pool.query(
-    `select p.product_key, p.name_az, pp.*
+    `select p.product_key, p.slug, p.name_az, pp.*
      from site_products p join product_prices pp on pp.product_key = p.product_key
      where p.active = true and p.product_key = any($1)`, [keys]);
   const map = new Map(rows.rows.map(r => [r.product_key, r]));
