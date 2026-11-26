@@ -34,6 +34,26 @@ async function putVal(key, value) {
   }
 }
 
+// SITE_URL yoxlaması: dəyişən təyin olunmasa belə, sayt öz domenində (vercel.app olmayan) işləyirsə
+// sitemap/canonical həmin domenlə qurulur (api/_seo.js origin()), buna görə xəta sayılmır.
+function siteUrlCheck(req) {
+  const host = String((req.headers && (req.headers["x-forwarded-host"] || req.headers.host)) || "").split(",")[0].trim().toLowerCase();
+  const hostBare = host.replace(/:\d+$/, "");
+  const onCustomDomain = !!hostBare && !/\.vercel\.app$/.test(hostBare) && hostBare !== "localhost";
+  const raw = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
+  const label = "SITE_URL / domen (sitemap, canonical üçün)";
+  if (raw) {
+    let sh = "";
+    try { sh = new URL(raw).host.toLowerCase(); } catch (e) {}
+    const same = sh === hostBare || sh === "www." + hostBare || "www." + sh === hostBare;
+    if (!sh) return { ok: false, label, fix: "SITE_URL düzgün ünvan deyil. Nümunə: https://" + (hostBare || "digibaku.com") };
+    if (onCustomDomain && !same) return { ok: false, label, fix: "SITE_URL (" + raw + ") hazırkı domendən (" + hostBare + ") fərqlidir. Düzəldin: https://" + hostBare };
+    return { ok: true, label: label + " — " + raw, fix: "" };
+  }
+  if (onCustomDomain) return { ok: true, label: label + " — avtomatik: https://" + hostBare, fix: "" };
+  return { ok: false, label, fix: "Sayt vercel.app ünvanındadır. SITE_URL = https://digibaku.com əlavə edin." };
+}
+
 async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -177,7 +197,7 @@ async function inner(req, res) {
         { ok: secret.length >= 32, label: "ADMIN_SECRET uzunluğu 32+ simvol", fix: "Vercel → Environment Variables: ADMIN_SECRET-i 40+ təsadüfi simvolla əvəz edin." },
         { ok: pass.length >= 12, label: "ADMIN_PASSWORD 12+ simvol", fix: "Daha uzun şifrə seçin (hərf+rəqəm+simvol)." },
         { ok: !!process.env.ADMIN_EMAIL, label: "ADMIN_EMAIL Vercel-də təyin olunub", fix: "ADMIN_EMAIL dəyişənini əlavə edin (kodda default e-poçt qalmasın)." },
-        { ok: !!process.env.SITE_URL, label: "SITE_URL təyin olunub (sitemap/canonical üçün)", fix: "SITE_URL = https://digibaku.com (öz domeniniz) əlavə edin." },
+        siteUrlCheck(req),
         { ok: !!process.env.DATABASE_URL, label: "DATABASE_URL təyin olunub", fix: "Neon connection string əlavə edin." }
       ]
     });

@@ -17,6 +17,27 @@ function fixCookie(c) {
   return s;
 }
 
+// Oxuna bilən (HttpOnly olmayan) giriş ipucu cookie-si: səhifə yenilənəndə "Daxil ol/Qeydiyyat" yanıb-sönməsinin qarşısını alır.
+// Həssas məlumat deyil, yalnız "1" saxlayır. Əsl sessiya HttpOnly cookie-dədir.
+const HINT = "digibaku_auth";
+function hintSet() { return HINT + "=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax"; }
+function hintClear() { return HINT + "=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax"; }
+
+// Çıxışda brauzerdəki bütün auth/sessiya cookie-lərini serverdən vaxtı bitmiş kimi göndərir
+// (Neon cavabı xəta qaytarsa və ya cookie adı fərqli olsa belə sessiya silinsin).
+function expireAuthCookies(req) {
+  const out = [];
+  String(req.headers.cookie || "").split(";").forEach(function (part) {
+    const name = part.split("=")[0].trim();
+    if (!name || name === HINT) return;
+    if (!/(neon|better-auth|session|auth)/i.test(name)) return;
+    ["/", "/api", "/api/auth"].forEach(function (path) {
+      out.push(name + "=; Path=" + path + "; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=Lax");
+    });
+  });
+  return out;
+}
+
 // Yalnız saytın istifadə etdiyi (və təhlükəsiz) auth ünvanlarına icazə verilir
 const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email|ok|update-user|change-email|change-password)$/;
 
@@ -86,9 +107,26 @@ async function authProxy(req, res) {
     return res.status(502).json({ message: "Auth serveri ilə əlaqə yoxdur." });
   }
   const sc = up.headers.getSetCookie ? up.headers.getSetCookie() : [];
-  if (sc.length) res.setHeader("Set-Cookie", sc.map(fixCookie));
+  let cookies = sc.map(fixCookie);
+  if (path === "sign-out") {
+    // Neon nə cavab versə də brauzerdə sessiya cookie-ləri silinir
+    cookies = cookies.concat(expireAuthCookies(req), [hintClear()]);
+  } else if ((path === "sign-in/email" || path === "sign-up/email") && up.status >= 200 && up.status < 300) {
+    cookies.push(hintSet());
+  } else if (path === "get-session") {
+    // Sessiya yoxlanışı hint cookie-ni həmişə həqiqətə uyğunlaşdırır (köhnə/ilişmiş hint qalmır)
+    let hasUser = false;
+    if (up.status >= 200 && up.status < 300) { try { const j = JSON.parse(text); hasUser = !!(j && j.user); } catch (e) {} }
+    if (hasUser) cookies.push(hintSet());
+    else if (up.status < 500) cookies.push(hintClear());
+  }
+  if (cookies.length) res.setHeader("Set-Cookie", cookies);
   const ct = up.headers.get("content-type");
   if (ct) res.setHeader("Content-Type", ct);
+  if (path === "sign-out") {
+    res.setHeader("Content-Type", "application/json");
+    return res.status(200).send(JSON.stringify({ success: true }));
+  }
   return res.status(up.status).send(text);
 }
 
