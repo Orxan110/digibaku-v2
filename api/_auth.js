@@ -61,7 +61,8 @@ async function fixAuditTable() {
       await c.query(`create table admin_audit (
         id bigserial primary key, action text not null, detail text, ip text,
         created_at timestamptz not null default now())`);
-      console.error("admin_audit yenidən yaradıldı, köhnəsi: " + old);
+      console.error("admin_audit yenidən yaradıldı, köhnəsi: " + old + " — " + lastAuditError);
+      lastAuditError = ""; // təmir uğurlu oldu, xəbərdarlıq göstərilməsin
     }
   } finally {
     c.release();
