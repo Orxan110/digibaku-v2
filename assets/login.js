@@ -44,4 +44,36 @@
     if(!r.ok) err.textContent=r.error; else ok.textContent=r.message;
   };
   setMode(mode);
+
+  // Şifrə bərpa linkindən gəlibsə (?token=...) yeni şifrə formu göstərilir
+  var rtoken=params.get("token");
+  if(rtoken||params.get("error")){
+    document.getElementById("tabLogin").parentNode.style.display="none";
+    form.style.display="none";
+    document.getElementById("forgot").parentNode.style.display="none";
+    var box=document.createElement("div");
+    if(!rtoken){
+      box.innerHTML='<p class="err">Bərpa linki etibarsızdır və ya vaxtı bitib. Yenidən sorğu göndərin.</p><p style="text-align:center"><a class="btn gold" href="login.html">Girişə qayıt</a></p>';
+    } else {
+      box.innerHTML='<h2 style="margin:0 0 12px;font-size:18px">Yeni şifrə təyin edin</h2>'+
+        '<div class="field"><label for="np1">Yeni şifrə (ən azı 8 simvol)</label><input id="np1" type="password" autocomplete="new-password"></div>'+
+        '<div class="field"><label for="np2">Şifrəni təkrarlayın</label><input id="np2" type="password" autocomplete="new-password"></div>'+
+        '<div class="err" id="npErr"></div><div class="ok" id="npOk"></div>'+
+        '<button class="btn gold" type="button" id="npBtn" style="width:100%">Şifrəni yenilə</button>';
+    }
+    form.parentNode.insertBefore(box,form);
+    var nb=document.getElementById("npBtn");
+    if(nb) nb.onclick=async function(){
+      var e1=document.getElementById("npErr"), o1=document.getElementById("npOk");
+      e1.textContent=""; o1.textContent="";
+      var a=document.getElementById("np1").value, b=document.getElementById("np2").value;
+      if(a!==b){ e1.textContent="Şifrələr eyni deyil."; return; }
+      nb.disabled=true;
+      var r=await DigiAuth.resetPassword({token:rtoken,newPassword:a});
+      nb.disabled=false;
+      if(!r.ok){ e1.textContent=r.error; return; }
+      o1.textContent=r.message;
+      setTimeout(function(){ location.href="login.html"; }, 1500);
+    };
+  }
 })();
