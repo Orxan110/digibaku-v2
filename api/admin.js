@@ -81,7 +81,7 @@ async function inner(req, res) {
   const action = (req.query && req.query.action) || "";
 
   if (req.method === "POST" && action === "login") {
-    const pass = process.env.ADMIN_PASSWORD || "";
+    const pass = String(process.env.ADMIN_PASSWORD || "").trim();
     const adminEmail = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
     if (!pass || !adminEmail || !process.env.ADMIN_SECRET || String(process.env.ADMIN_SECRET).length < 32) {
       return res.status(500).json({ ok: false, error: "ADMIN_EMAIL, ADMIN_PASSWORD və ya ADMIN_SECRET (32+ simvol) Vercel-də təyin olunmayıb." });
@@ -97,7 +97,7 @@ async function inner(req, res) {
     const b = body(req);
     // Hər iki sahə həmişə yoxlanır (hansının səhv olduğu bilinməsin)
     const okEmail = safeEq(String(b.email || "").trim().toLowerCase(), adminEmail);
-    const okPass = safeEq(b.password || "", pass);
+    const okPass = safeEq(String(b.password || "").trim(), pass);
     if (!(okEmail && okPass)) {
       await AUTH.audit("login_failed", null, ip);
       await new Promise(function (r) { setTimeout(r, 700); });
