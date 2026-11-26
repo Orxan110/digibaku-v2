@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("./_db");
-const { verify } = require("./_auth");
+const { verify, rateLimit, clientIp } = require("./_auth");
 const { reply: botReply, TX: BOT_TX } = require("./_bot");
 const { aiReply } = require("./_ai");
 
@@ -151,7 +151,14 @@ async function handler(req, res) {
 
   try {
     await ensureFiles();
-
+        // Spam / bot qorunması (IP üzrə)
+    if (req.method === "POST" && (action === "send" || action === "upload")) {
+      const ip = clientIp(req);
+      const bt = (req.body && typeof req.body === "object") ? req.body : {};
+      let ok = await rateLimit("chat:" + ip, action === "upload" ? 15 : 40, 600);
+      if (ok && !bt.token) ok = await rateLimit("chatnew:" + ip, 6, 3600);
+      if (!ok) return res.status(429).json({ ok: false, error: "Çox tez-tez müraciət edirsiniz. Bir az gözləyin." });
+    }
     // ================= ZİYARƏTÇİ =================
     if (req.method === "POST" && action === "send") {
       const b = body(req);
