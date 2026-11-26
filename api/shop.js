@@ -1,4 +1,4 @@
-const { pool, getUser, ensureSchema, NEON_BASE } = require("./_db");
+const { pool, getUser, ensureSchema, NEON_BASE, upstreamOrigin } = require("./_db");
 const { rateLimit, clientIp, sameOrigin } = require("./_auth");
 
 function body(req) {
@@ -18,11 +18,17 @@ function fixCookie(c) {
 }
 
 // Yalnız saytın istifadə etdiyi (və təhlükəsiz) auth ünvanlarına icazə verilir
-const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email|update-user|change-email|change-password)$/;
+const AUTH_ALLOW = /^(sign-up\/email|sign-in\/email|sign-out|get-session|token|forget-password|request-password-reset|reset-password|verify-email|send-verification-email|ok|update-user|change-email|change-password)$/;
 
 async function authProxy(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const path = String(req.query.p || "").replace(/^\/+|\/+$/g, "");
+  let rawPath = String((req.query && req.query.p) || "");
+  if (!rawPath) {
+    // Rewrite parametri gəlməyibsə, ünvandan götür
+    const m = String(req.url || "").match(/\/api\/auth\/([^?]*)/);
+    if (m) rawPath = decodeURIComponent(m[1]);
+  }
+  const path = rawPath.replace(/^\/+|\/+$/g, "");
   if (!AUTH_ALLOW.test(path)) {
     return res.status(404).json({ message: "Not found" });
   }
@@ -39,8 +45,8 @@ async function authProxy(req, res) {
   const ip = clientIp(req);
   if (req.method === "POST") {
     let ok = true;
-    if (path === "sign-in/email") ok = await rateLimit("auth-in:" + ip, 10, 600);
-    else if (path === "sign-up/email") ok = await rateLimit("auth-up:" + ip, 5, 3600);
+    if (path === "sign-in/email") ok = await rateLimit("auth-in:" + ip, 20, 600);
+    else if (path === "sign-up/email") ok = await rateLimit("auth-up:" + ip, 10, 3600);
     else if (/password|verif/.test(path) && path !== "change-password") ok = await rateLimit("auth-pw:" + ip, 5, 3600);
     else if (path === "change-password" || path === "change-email") ok = await rateLimit("auth-chg:" + ip, 10, 3600);
     if (!ok) return res.status(429).json({ message: "Çox cəhd edildi. Bir az sonra yenidən yoxlayın." });
@@ -53,7 +59,8 @@ async function authProxy(req, res) {
   });
   const url = NEON_BASE + "/" + path + (qs.toString() ? "?" + qs.toString() : "");
 
-  const h = { Accept: "application/json", Origin: req.headers.origin || ("https://" + host) };
+  const h = { Accept: "application/json", Origin: upstreamOrigin(req), "X-Forwarded-For": ip };
+  if (req.headers["user-agent"]) h["User-Agent"] = req.headers["user-agent"];
   if (req.headers.cookie) h.Cookie = req.headers.cookie;
   if (req.headers.authorization) h.Authorization = req.headers.authorization;
   let payload;
@@ -65,7 +72,7 @@ async function authProxy(req, res) {
 
   let up;
   try {
-    up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual" });
+    up = await fetch(url, { method: req.method, headers: h, body: payload, redirect: "manual", signal: AbortSignal.timeout(15000) });
   } catch (e) {
     console.error("auth proxy:", e);
     return res.status(502).json({ message: "Auth serveri ilə əlaqə yoxdur." });
