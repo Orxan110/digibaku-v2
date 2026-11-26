@@ -1,5 +1,7 @@
 const { pool, getUser, ensureSchema, NEON_BASE, upstreamOrigin, FALLBACK_ORIGIN } = require("./_db");
 const { rateLimit, clientIp, sameOrigin } = require("./_auth");
+const { ensureCustomerTables } = require("../lib/customers");
+const { expiringSql } = require("../lib/subs");
 
 function body(req) {
   if (!req.body) return {};
@@ -248,11 +250,29 @@ async function wishlist(req, res) {
   }
 }
 
+// Müştərinin öz bitməyə yaxın abunələri (sayt içində bildiriş)
+async function expiring(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ ok: false, error: "Daxil olun." });
+  try {
+    await ensureCustomerTables(pool);
+    const r = await pool.query(expiringSql(true), [user.id]);
+    return res.status(200).json({ ok: true, items: r.rows.map(function (x) {
+      return { product_key: x.product_key, name: x.name, ends_at: x.ends_at };
+    }) });
+  } catch (e) {
+    console.error("expiring:", e);
+    return res.status(500).json({ ok: false, error: "Bildirişlər yüklənmədi." });
+  }
+}
+
 module.exports = async function handler(req, res) {
   const action = (req.query && req.query.action) || "";
   if (action === "auth") return authProxy(req, res);
   if (action === "extra" && req.method === "GET") return extra(req, res);
   if (action === "review") return review(req, res);
   if (action === "wish") return wishlist(req, res);
+  if (action === "expiring" && req.method === "GET") return expiring(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };

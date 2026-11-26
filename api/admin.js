@@ -3,6 +3,7 @@ const { pool } = require("./_db");
 const AUTH = require("./_auth");
 const { ensureDiscountTable } = require("../lib/pricing");
 const { ensureCustomerTables } = require("../lib/customers");
+const { expiringSql } = require("../lib/subs");
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
@@ -660,6 +661,29 @@ async function inner(req, res) {
     } finally {
       client.release();
     }
+  }
+
+  // ================= ABUNƏ XATIRLATMASI =================
+  if (req.method === "GET" && action === "expiring") {
+    await ensureCustomerTables(pool);
+    const r = await pool.query(expiringSql(false));
+    return res.status(200).json({ ok: true, items: r.rows });
+  }
+
+  if (req.method === "POST" && action === "customer_phone") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const id = String(b.id || "");
+    const phone = String(b.phone || "").replace(/[\s\-()]/g, "");
+    if (!id) return res.status(400).json({ ok: false, error: "Müştəri göstərilməyib." });
+    if (phone && !/^\+?\d{9,15}$/.test(phone)) {
+      return res.status(400).json({ ok: false, error: "Telefon düzgün deyil (məs: +994501234567)." });
+    }
+    await pool.query(
+      `insert into customer_profiles (user_id, phone) values ($1, $2)
+       on conflict (user_id) do update set phone = excluded.phone, updated_at = now()`,
+      [id, phone || null]);
+    return res.status(200).json({ ok: true });
   }
 
   // ================= PLANLI ENDİRİM =================
