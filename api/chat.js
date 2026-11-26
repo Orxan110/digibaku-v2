@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("./_db");
-const { verify, rateLimit, clientIp } = require("./_auth");
+const { verify, rateLimit, clientIp, audit } = require("./_auth");
 const { reply: botReply, TX: BOT_TX } = require("./_bot");
 const { aiReply } = require("./_ai");
 
@@ -72,7 +72,7 @@ async function ensureFiles() {
 }
 
 // Ziyarətçinin söhbətini tapır, yoxdursa yaradır. Limit aşılıbsa cavab göndərir və null qaytarır.
-async function visitorThread(b, res) {
+async function visitorThread(b, res, req) {
   let token = txt(b.token, 100);
   let thread = null;
   if (token) {
@@ -80,6 +80,10 @@ async function visitorThread(b, res) {
     thread = r.rows[0] || null;
   }
   if (!thread) {
+    if (!(await rateLimit("chatnew:" + clientIp(req), 6, 3600))) {
+      res.status(429).json({ ok: false, error: "Çox tez-tez müraciət edirsiniz. Bir az gözləyin." });
+      return null;
+    }
     const recent = await pool.query(
       "select count(*)::int as n from chat_threads where created_at > now() - interval '1 hour'");
     if (recent.rows[0].n >= 60) {
@@ -154,9 +158,7 @@ async function handler(req, res) {
         // Spam / bot qorunması (IP üzrə)
     if (req.method === "POST" && (action === "send" || action === "upload")) {
       const ip = clientIp(req);
-      const bt = (req.body && typeof req.body === "object") ? req.body : {};
       let ok = await rateLimit("chat:" + ip, action === "upload" ? 15 : 40, 600);
-      if (ok && !bt.token) ok = await rateLimit("chatnew:" + ip, 6, 3600);
       if (!ok) return res.status(429).json({ ok: false, error: "Çox tez-tez müraciət edirsiniz. Bir az gözləyin." });
     }
     // ================= ZİYARƏTÇİ =================
@@ -165,7 +167,7 @@ async function handler(req, res) {
       const text = txt(b.body, 1000);
       if (!text) return res.status(400).json({ ok: false, error: "Mesaj yazın." });
 
-      const vt = await visitorThread(b, res);
+      const vt = await visitorThread(b, res, req);
       if (!vt) return;
       const thread = vt.thread, token = vt.token;
 
@@ -197,7 +199,7 @@ async function handler(req, res) {
       if (buf.length > MAX_FILE) return res.status(413).json({ ok: false, error: "Fayl çox böyükdür (maksimum 2.5 MB)." });
       if (!magicOk(ext, buf)) return res.status(400).json({ ok: false, error: "Fayl zədəlidir və ya növü uyğun deyil." });
 
-      const vt = await visitorThread(b, res);
+      const vt = await visitorThread(b, res, req);
       if (!vt) return;
       const thread = vt.thread, token = vt.token;
 
@@ -360,7 +362,9 @@ async function handler(req, res) {
       const id = String(b.thread || "");
       if (!UUID_RE.test(id)) return res.status(400).json({ ok: false, error: "Söhbət yanlışdır." });
       await pool.query("delete from chat_files where thread_id = $1", [id]);
+      await pool.query("delete from chat_messages where thread_id = $1", [id]);
       const r = await pool.query("delete from chat_threads where id = $1 returning id", [id]);
+      audit("chat_delete", id, clientIp(req));
       if (!r.rowCount) return res.status(404).json({ ok: false, error: "Söhbət tapılmadı." });
       return res.status(200).json({ ok: true });
     }
@@ -384,6 +388,7 @@ async function handler(req, res) {
       } finally {
         c.release();
       }
+      audit("chat_delete_all", String(n), clientIp(req));
       return res.status(200).json({ ok: true, deleted: n });
     }
 

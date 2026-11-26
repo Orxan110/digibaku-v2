@@ -1,12 +1,9 @@
 // v1
 const { pool } = require("./_db");
-const { verify } = require("./_auth");
+const { requireAdmin, audit, clientIp, safeUrl } = require("./_auth");
 
-module.exports = async function handler(req, res) {
+async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const h = req.headers.authorization || "";
-  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
-  if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   const action = (req.query && req.query.action) || "";
   if (req.method !== "GET" || action !== "summary") {
@@ -45,4 +42,17 @@ module.exports = async function handler(req, res) {
     days: days.rows,
     top: top.rows
   });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    if (!requireAdmin(req, res)) return;
+    if (req.method === "POST") {
+      await audit("stats:" + ((req.query && req.query.action) || ""), null, clientIp(req));
+    }
+    return await inner(req, res);
+  } catch (e) {
+    console.error("stats:", e);
+    if (!res.headersSent) return res.status(500).json({ ok: false, error: "Server xətası." });
+  }
 };

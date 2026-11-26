@@ -39,7 +39,8 @@ function ensureSecurity() {
 
 // Sabit pəncərəli limit. true = icazə var, false = limit aşılıb.
 // Baza xətası olarsa sayt dayanmasın deyə icazə verir.
-async function rateLimit(key, max, windowSec) {
+// failClosed=true olarsa baza xətasında icazə VERİLMİR (admin girişi üçün).
+async function rateLimit(key, max, windowSec, failClosed) {
   try {
     await ensureSecurity();
     const r = await pool.query(
@@ -54,7 +55,7 @@ async function rateLimit(key, max, windowSec) {
     return r.rows[0].n <= max;
   } catch (e) {
     console.error("rateLimit:", e);
-    return true;
+    return !failClosed;
   }
 }
 
@@ -69,4 +70,26 @@ async function audit(action, detail, ip) {
   }
 }
 
-module.exports = { verify, clientIp, rateLimit, audit, ensureSecurity };
+// Etibarlı URL: yalnız "/yol" (// olmadan) və ya https://. Boş = icazəli (null qaytarır), yanlış = false.
+function safeUrl(v, max) {
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  if (s.length > (max || 500)) return false;
+  if (/[\s"'<>\\]/.test(s)) return false;
+  if (s.charAt(0) === "/" && s.charAt(1) !== "/") return s;
+  if (/^https:\/\/[^/]/i.test(s)) return s;
+  return false;
+}
+
+// Admin yoxlaması. Uğursuzdursa cavab göndərir və null qaytarır.
+function requireAdmin(req, res) {
+  const h = req.headers.authorization || "";
+  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
+  if (!p || p.role !== "admin") {
+    res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
+    return null;
+  }
+  return p;
+}
+
+module.exports = { verify, clientIp, rateLimit, audit, ensureSecurity, safeUrl, requireAdmin };

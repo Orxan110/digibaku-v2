@@ -43,8 +43,6 @@ const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"
 const MONTHS = [1, 2, 3, 6, 12];
 const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
 const FAQ_LANGS = ["az", "ru", "en"];
-const loginTries = globalThis.digibakuLoginTries || new Map();
-globalThis.digibakuLoginTries = loginTries;
 
 function body(req) {
   if (!req.body) return {};
@@ -59,19 +57,7 @@ function sign(payload) {
   return data + "." + sig;
 }
 
-function verify(token) {
-  const secret = process.env.ADMIN_SECRET || "";
-  if (!secret || !token || token.indexOf(".") < 0) return null;
-  const parts = token.split(".");
-  const data = parts[0], sig = parts[1];
-  const expect = crypto.createHmac("sha256", secret).update(data).digest("base64url");
-  const a = Buffer.from(sig), b = Buffer.from(expect);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  let p;
-  try { p = JSON.parse(Buffer.from(data, "base64url").toString()); } catch (e) { return null; }
-  if (!p.exp || Date.now() > p.exp) return null;
-  return p;
-}
+const verify = AUTH.verify;
 
 function safeEq(x, y) {
   const a = Buffer.from(String(x)), b = Buffer.from(String(y));
@@ -96,30 +82,29 @@ async function inner(req, res) {
 
   if (req.method === "POST" && action === "login") {
     const pass = process.env.ADMIN_PASSWORD || "";
-    const adminEmail = String(process.env.ADMIN_EMAIL || "zahidovorxan989@gmail.com").trim().toLowerCase();
-    if (!pass || !process.env.ADMIN_SECRET) {
-      return res.status(500).json({ ok: false, error: "ADMIN_PASSWORD və ya ADMIN_SECRET Vercel-də təyin olunmayıb." });
+    const adminEmail = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+    if (!pass || !adminEmail || !process.env.ADMIN_SECRET || String(process.env.ADMIN_SECRET).length < 32) {
+      return res.status(500).json({ ok: false, error: "ADMIN_EMAIL, ADMIN_PASSWORD və ya ADMIN_SECRET (32+ simvol) Vercel-də təyin olunmayıb." });
     }
-        const ip = AUTH.clientIp(req);
-    const okIp = await AUTH.rateLimit("login:" + ip, 10, 900);
-    const okAll = await AUTH.rateLimit("login:all", 60, 900);
+    const ip = AUTH.clientIp(req);
+    // fail-closed: baza işləməsə də brute-force limiti keçilmir
+    const okIp = await AUTH.rateLimit("login:" + ip, 8, 900, true);
+    const okAll = await AUTH.rateLimit("login:all", 120, 900, true);
     if (!okIp || !okAll) {
+      await AUTH.audit("login_blocked", null, ip);
       return res.status(429).json({ ok: false, error: "Çox sayda cəhd. Bir az sonra yenidən yoxlayın." });
     }
-    const rec = { n: 0, until: 0 };
     const b = body(req);
     // Hər iki sahə həmişə yoxlanır (hansının səhv olduğu bilinməsin)
     const okEmail = safeEq(String(b.email || "").trim().toLowerCase(), adminEmail);
     const okPass = safeEq(b.password || "", pass);
     if (!(okEmail && okPass)) {
-      rec.n += 1;
-      if (rec.n >= 5) { rec.until = Date.now() + 15 * 60 * 1000; rec.n = 0; }
-      loginTries.set(ip, rec);
+      await AUTH.audit("login_failed", null, ip);
       await new Promise(function (r) { setTimeout(r, 700); });
       return res.status(401).json({ ok: false, error: "E-poçt və ya şifrə yanlışdır." });
     }
-    loginTries.delete(ip);
-    const token = sign({ role: "admin", exp: Date.now() + 12 * 60 * 60 * 1000 });
+    await AUTH.audit("login_ok", null, ip);
+    const token = sign({ role: "admin", iat: Date.now(), exp: Date.now() + 8 * 60 * 60 * 1000 });
     return res.status(200).json({ ok: true, token: token });
   }
 
@@ -325,13 +310,18 @@ async function inner(req, res) {
       const buf = Buffer.from(m[2], "base64");
       if (!buf.length) return res.status(400).json({ ok: false, error: "Şəkil boşdur." });
       if (buf.length > IMG_MAX_BYTES) return res.status(413).json({ ok: false, error: "Şəkil çox böyükdür (maksimum 2 MB)." });
+      const okMagic =
+        (m[1] === "image/jpeg" && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) ||
+        (m[1] === "image/png" && buf.toString("hex", 0, 4) === "89504e47") ||
+        (m[1] === "image/webp" && buf.length > 12 && buf.toString("latin1", 0, 4) === "RIFF" && buf.toString("latin1", 8, 12) === "WEBP");
+      if (!okMagic) return res.status(400).json({ ok: false, error: "Fayl şəkil formatına uyğun deyil." });
       await ensureImages();
       const id = crypto.randomBytes(16).toString("hex");
       await pool.query("insert into product_images (id, mime, data) values ($1, $2, $3)", [id, m[1], buf]);
       return res.status(200).json({ ok: true, url: "/api/products?img=" + id });
     } catch (e) {
       console.error("image_upload:", e);
-      return res.status(500).json({ ok: false, error: "Şəkil bazaya yazılmadı: " + String(e && e.message || e) });
+      return res.status(500).json({ ok: false, error: "Şəkil bazaya yazılmadı." });
     }
   }
 
@@ -350,7 +340,7 @@ async function inner(req, res) {
       if (!c.rowCount) return res.status(400).json({ ok: false, error: "Kateqoriya tapılmadı." });
     }
     const img = txt(b.image_url);
-    if (img && !(img.charAt(0) === "/" || /^https:\/\//.test(img))) {
+    if (img && AUTH.safeUrl(img) === false) {
       return res.status(400).json({ ok: false, error: "Şəkil linki yanlışdır." });
     }
     const dup = await pool.query("select 1 from site_products where product_key = $1 or slug = $1", [slug]);
@@ -445,7 +435,7 @@ async function inner(req, res) {
     } catch (e) {
       await client.query("rollback").catch(function () {});
       console.error("product_purge:", e);
-      return res.status(500).json({ ok: false, error: "Silinmədi: " + String(e && e.message || e) });
+      return res.status(500).json({ ok: false, error: "Silinmədi." });
     } finally {
       client.release();
     }
@@ -482,7 +472,7 @@ async function inner(req, res) {
     } catch (e) {
       await client.query("rollback").catch(function () {});
       console.error("product_duplicate:", e);
-      return res.status(500).json({ ok: false, error: "Kopyalanmadı: " + String(e && e.message || e) });
+      return res.status(500).json({ ok: false, error: "Kopyalanmadı." });
     } finally {
       client.release();
     }
@@ -533,7 +523,7 @@ module.exports = async function handler(req, res) {
       const b = body(req);
       if (action === "product_save") {
         const img = String(b.image_url || "").trim();
-        if (img && !(img.charAt(0) === "/" || /^https:\/\//.test(img))) {
+        if (img && AUTH.safeUrl(img) === false) {
           res.setHeader("Cache-Control", "no-store");
           return res.status(400).json({ ok: false, error: "Şəkil linki / və ya https:// ilə başlamalıdır." });
         }

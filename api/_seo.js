@@ -33,7 +33,8 @@ function ld(obj) {
 }
 function abs(o, u) {
   if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
+  if (/^https:\/\//i.test(u)) return u;
+  if (u.charAt(0) === "/" && u.charAt(1) === "/") return "";
   return o + (u.charAt(0) === "/" ? "" : "/") + u;
 }
 function cut(s, n) {

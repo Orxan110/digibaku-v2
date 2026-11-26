@@ -1,5 +1,5 @@
 const { pool } = require("./_db");
-const { verify, clientIp, audit, ensureSecurity } = require("./_auth");
+const { requireAdmin, clientIp, audit, ensureSecurity, safeUrl } = require("./_auth");
 
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
@@ -34,11 +34,8 @@ async function putVal(key, value) {
   }
 }
 
-module.exports = async function handler(req, res) {
+async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const h = req.headers.authorization || "";
-  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
-  if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   const action = (req.query && req.query.action) || "";
   const q = req.query || {};
@@ -61,10 +58,10 @@ module.exports = async function handler(req, res) {
     if (next.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(next.email)) {
       return res.status(400).json({ ok: false, error: "E-poçt düzgün deyil." });
     }
-    if (next.instagram && !/^https?:\/\//.test(next.instagram)) {
+    if (next.instagram && !/^https:\/\/[^\s"'<>]+$/.test(next.instagram)) {
       return res.status(400).json({ ok: false, error: "Instagram linki https:// ilə başlamalıdır." });
     }
-    if (next.tiktok && !/^https?:\/\//.test(next.tiktok)) {
+    if (next.tiktok && !/^https:\/\/[^\s"'<>]+$/.test(next.tiktok)) {
       return res.status(400).json({ ok: false, error: "TikTok linki https:// ilə başlamalıdır." });
     }
     ["color_gold", "color_sale", "color_chat", "color_bg", "color_card", "color_wa"].forEach(function (k) {
@@ -84,7 +81,6 @@ module.exports = async function handler(req, res) {
     const wico = String(b.wa_icon == null ? "" : b.wa_icon).trim();
     next.wa_icon = (wico.length <= 90000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(wico)) ? wico : "";
     await putVal("general", next);
-    audit("settings_save", "general", clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -105,7 +101,6 @@ module.exports = async function handler(req, res) {
       next["body_" + l] = clean(b["body_" + l], 20000);
     });
     await putVal("page_" + key, next);
-    audit("page_save", key, clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -125,14 +120,13 @@ module.exports = async function handler(req, res) {
       next["keywords_" + l] = clean(b["keywords_" + l], 300);
     });
     const img = clean(b.og_image, 300);
-    if (img && !(img.charAt(0) === "/" || /^https:\/\//.test(img))) {
+    if (img && safeUrl(img, 300) === false) {
       return res.status(400).json({ ok: false, error: "Şəkil linki / və ya https:// ilə başlamalıdır." });
     }
     next.og_image = img;
     const all = (await getVal("seo")) || {};
     all[key] = next;
     await putVal("seo", all);
-    audit("seo_save", key, clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -164,7 +158,6 @@ module.exports = async function handler(req, res) {
     };
     if (!next.title_az && !next.desc_az && !next.keywords_az) delete all[slug]; else all[slug] = next;
     await putVal("product_seo", all);
-    audit("product_seo_save", slug, clientIp(req));
     return res.status(200).json({ ok: true });
   }
 
@@ -191,4 +184,17 @@ module.exports = async function handler(req, res) {
   }
 
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    if (!requireAdmin(req, res)) return;
+    if (req.method === "POST") {
+      await audit("settings:" + ((req.query && req.query.action) || ""), null, clientIp(req));
+    }
+    return await inner(req, res);
+  } catch (e) {
+    console.error("settings:", e);
+    if (!res.headersSent) return res.status(500).json({ ok: false, error: "Server xətası." });
+  }
 };

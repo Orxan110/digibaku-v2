@@ -1,6 +1,6 @@
 // v1
 const { pool, ensureSchema } = require("./_db");
-const { verify } = require("./_auth");
+const { requireAdmin, audit, clientIp, safeUrl } = require("./_auth");
 
 const STATUSES = ["pending", "approved", "rejected"];
 
@@ -14,11 +14,8 @@ function txt(v) {
   return s ? s : null;
 }
 
-module.exports = async function handler(req, res) {
+async function inner(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  const h = req.headers.authorization || "";
-  const p = verify(h.replace(/^Bearer\s+/i, "").trim());
-  if (!p || p.role !== "admin") return res.status(401).json({ ok: false, error: "Admin girişi tələb olunur." });
 
   const action = (req.query && req.query.action) || "";
   await ensureSchema();
@@ -80,4 +77,17 @@ module.exports = async function handler(req, res) {
   }
 
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    if (!requireAdmin(req, res)) return;
+    if (req.method === "POST") {
+      await audit("reviews:" + ((req.query && req.query.action) || ""), null, clientIp(req));
+    }
+    return await inner(req, res);
+  } catch (e) {
+    console.error("reviews:", e);
+    if (!res.headersSent) return res.status(500).json({ ok: false, error: "Server xətası." });
+  }
 };

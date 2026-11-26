@@ -2,7 +2,7 @@ const { Pool } = require("pg");
 
 const pool = globalThis.digibakuPool || new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: { rejectUnauthorized: true },
   max: 3,
   idleTimeoutMillis: 20000,
   connectionTimeoutMillis: 8000
