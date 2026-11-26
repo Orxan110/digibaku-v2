@@ -1,5 +1,5 @@
 const { pool } = require("./_db");
-const { requireAdmin, clientIp, audit, ensureSecurity, safeUrl } = require("./_auth");
+const { requireAdmin, clientIp, audit, auditError, ensureSecurity, safeUrl } = require("./_auth");
 
 const FIELDS = ["site_name", "logo_text",
   "city_az", "city_ru", "city_en", "hours_az", "hours_ru", "hours_en",
@@ -186,7 +186,7 @@ async function inner(req, res) {
     try {
       await ensureSecurity();
       const r = await pool.query("select id, action, detail, ip, created_at from admin_audit order by created_at desc, id desc limit 200");
-      return res.status(200).json({ ok: true, rows: r.rows });
+      return res.status(200).json({ ok: true, rows: r.rows, writeError: auditError() || "" });
     } catch (e) {
       console.error("audit_list:", e);
       return res.status(500).json({ ok: false, error: "Jurnal oxunmadı: " + String(e && e.message || e).slice(0, 160) });
