@@ -39,6 +39,23 @@ async function ensureDeliveryCol() {
   }
   return dlvColReady;
 }
+let couponsReady = null;
+async function ensureCouponsTable() {
+  if (!couponsReady) {
+    couponsReady = pool.query(`create table if not exists coupons (
+        code text primary key,
+        kind text not null check (kind in ('percent', 'fixed')),
+        value numeric(10,2) not null check (value > 0),
+        min_total numeric(10,2) not null default 0,
+        max_uses integer,
+        used_count integer not null default 0,
+        expires_at timestamptz,
+        active boolean not null default true,
+        created_at timestamptz not null default now())`)
+      .catch(function (e) { couponsReady = null; throw e; });
+  }
+  return couponsReady;
+}
 const STATUSES = ["pending", "confirmed", "processing", "completed", "cancelled"];
 const MONTHS = [1, 2, 3, 6, 12];
 const CAT_KEY_RE = /^[a-z0-9_]{2,40}$/;
@@ -513,6 +530,65 @@ async function inner(req, res) {
     if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sifariş tapılmadı." });
     return res.status(200).json({ ok: true });
   }
+  // ================= KUPONLAR =================
+  if (req.method === "GET" && action === "coupons") {
+    await ensureCouponsTable();
+    const r = await pool.query(
+      `select code, kind, value, min_total, max_uses, used_count, expires_at, active, created_at
+       from coupons order by created_at desc`);
+    return res.status(200).json({ ok: true, coupons: r.rows });
+  }
+
+  if (req.method === "POST" && action === "coupon_save") {
+    await ensureCouponsTable();
+    const b = body(req);
+    const code = String(b.code || "").trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{3,40}$/.test(code)) {
+      return res.status(400).json({ ok: false, error: "Kod 3–40 simvol olmalıdır: böyük hərf, rəqəm, - və _." });
+    }
+    const kind = b.kind === "fixed" ? "fixed" : (b.kind === "percent" ? "percent" : null);
+    if (!kind) return res.status(400).json({ ok: false, error: "Tip seçin (faiz və ya sabit AZN)." });
+    const value = num(b.value);
+    if (!(value > 0)) return res.status(400).json({ ok: false, error: "Dəyər 0-dan böyük olmalıdır." });
+    if (kind === "percent" && value > 100) return res.status(400).json({ ok: false, error: "Faiz 100-dən çox ola bilməz." });
+    const minTotal = (b.min_total === "" || b.min_total == null) ? 0 : num(b.min_total);
+    if (!(minTotal >= 0)) return res.status(400).json({ ok: false, error: "Minimum məbləğ düzgün deyil." });
+    let maxUses = null;
+    if (b.max_uses !== "" && b.max_uses !== null && b.max_uses !== undefined) {
+      maxUses = parseInt(b.max_uses, 10);
+      if (!(maxUses >= 1)) return res.status(400).json({ ok: false, error: "Limit ən azı 1 olmalıdır (boş qoysanız limit olmayacaq)." });
+    }
+    let expires = null;
+    if (b.expires_at) {
+      // Admin Bakı vaxtı ilə daxil edir (+04:00), əgər saat qurşağı yazılmayıbsa
+      const raw = String(b.expires_at);
+      const d = new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : raw + "+04:00");
+      if (isNaN(d.getTime())) return res.status(400).json({ ok: false, error: "Bitmə tarixi düzgün deyil." });
+      expires = d.toISOString();
+    }
+    const active = !(b.active === false || b.active === "false");
+    await pool.query(
+      `insert into coupons (code, kind, value, min_total, max_uses, expires_at, active)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (code) do update set kind = excluded.kind, value = excluded.value,
+         min_total = excluded.min_total, max_uses = excluded.max_uses,
+         expires_at = excluded.expires_at, active = excluded.active`,
+      [code, kind, value, minTotal, maxUses, expires, active]);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "coupon_delete") {
+    await ensureCouponsTable();
+    const code = String(body(req).code || "").trim().toUpperCase();
+    const r = await pool.query("select used_count from coupons where code = $1", [code]);
+    if (!r.rowCount) return res.status(404).json({ ok: false, error: "Kupon tapılmadı." });
+    if (r.rows[0].used_count > 0) {
+      return res.status(400).json({ ok: false, error: "İstifadə olunmuş kuponu silmək olmaz. Onu söndürün." });
+    }
+    await pool.query("delete from coupons where code = $1", [code]);
+    return res.status(200).json({ ok: true });
+  }
+
   // ================= ADMIN-EXTRA (son) =================
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 }
