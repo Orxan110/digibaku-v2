@@ -2,12 +2,38 @@ const { pool, getUserId } = require("./_db");
 const { rateLimit, sameOrigin } = require("./_auth");
 
 const MONTHS = [1, 2, 3, 6, 12];
+const BAD_COUPON = "Kupon etibarsızdır və ya müddəti bitib.";
 
-let dlvReady = null;
-function ensureDlv() {
-  if (!dlvReady) dlvReady = pool.query("alter table orders add column if not exists delivery_info text")
-    .catch(function (e) { dlvReady = null; throw e; });
-  return dlvReady;
+let schemaReady = null;
+function ensureSchema() {
+  if (!schemaReady) {
+    schemaReady = (async function () {
+      await pool.query("alter table orders add column if not exists delivery_info text");
+      await pool.query("alter table orders add column if not exists coupon_code text");
+      await pool.query("alter table orders add column if not exists discount_amount numeric(10,2) not null default 0");
+      // kind: 'percent' (faiz) və ya 'fixed' (sabit AZN). Kodlar həmişə BÖYÜK HƏRFLƏ saxlanılır.
+      await pool.query(`create table if not exists coupons (
+        code text primary key,
+        kind text not null check (kind in ('percent', 'fixed')),
+        value numeric(10,2) not null check (value > 0),
+        min_total numeric(10,2) not null default 0,
+        max_uses integer,
+        used_count integer not null default 0,
+        expires_at timestamptz,
+        active boolean not null default true,
+        created_at timestamptz not null default now()
+      )`);
+      // Hər istifadəçi eyni kuponu yalnız bir dəfə işlədə bilər
+      await pool.query(`create table if not exists coupon_uses (
+        code text not null,
+        user_id text not null,
+        order_id text,
+        created_at timestamptz not null default now(),
+        primary key (code, user_id)
+      )`);
+    })().catch(function (e) { schemaReady = null; throw e; });
+  }
+  return schemaReady;
 }
 
 function body(req) {
@@ -16,16 +42,81 @@ function body(req) {
   return req.body;
 }
 
+function httpErr(status, msg) {
+  const e = new Error(msg);
+  e.status = status;
+  return e;
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+function normalizeCode(v) {
+  return String(v || "").trim().toUpperCase().slice(0, 40);
+}
+
+// Səbəti serverdə qiymətləndirir (client qiymətinə etibar edilmir)
+async function priceCart(input) {
+  if (!Array.isArray(input) || input.length === 0 || input.length > 20) {
+    throw httpErr(400, "Səbət boşdur.");
+  }
+  const keys = [...new Set(input.map(i => String((i && i.product_key) || "").slice(0, 100)))];
+  const rows = await pool.query(
+    `select p.product_key, p.name_az, pp.*
+     from site_products p join product_prices pp on pp.product_key = p.product_key
+     where p.active = true and p.product_key = any($1)`, [keys]);
+  const map = new Map(rows.rows.map(r => [r.product_key, r]));
+
+  const items = [];
+  let subtotal = 0;
+  for (const i of input) {
+    const months = Number(i && i.months);
+    const qty = Math.min(10, Math.max(1, parseInt(i && i.qty, 10) || 1));
+    const r = map.get(String((i && i.product_key) || ""));
+    if (!r || !MONTHS.includes(months)) throw httpErr(400, "Səbətdə etibarsız məhsul var.");
+    const sale = Number(r[`sale_${months}_price`]);
+    const base = Number(r[`price_${months}_month`]);
+    const unit = r[`sale_${months}_active`] === true && sale > 0 ? sale : base;
+    if (!(unit > 0)) throw httpErr(400, "Bu müddət üçün qiymət yoxdur.");
+    items.push({ product_key: r.product_key, name: r.name_az, months, qty, unit_price: Number(unit.toFixed(2)) });
+    subtotal += unit * qty;
+  }
+  return { items, subtotal: round2(subtotal) };
+}
+
+function discountFor(c, subtotal) {
+  let d = c.kind === "percent" ? subtotal * Number(c.value) / 100 : Number(c.value);
+  if (d > subtotal) d = subtotal;
+  return round2(Math.max(0, d));
+}
+
+// Kuponu yoxlayır. db = pool və ya transaksiya client-i. lock=true → sətir kilidlənir.
+async function checkCoupon(db, code, userId, subtotal, lock) {
+  const r = await db.query(
+    `select code, kind, value, min_total from coupons
+     where code = $1 and active = true
+       and (expires_at is null or expires_at > now())
+       and (max_uses is null or used_count < max_uses)
+     ${lock ? "for update" : ""}`, [code]);
+  const c = r.rows[0];
+  if (!c) throw httpErr(400, BAD_COUPON);
+  if (subtotal < Number(c.min_total)) {
+    throw httpErr(400, "Bu kupon üçün səbət məbləği çatmır (minimum " + Number(c.min_total).toFixed(2) + " AZN).");
+  }
+  const used = await db.query("select 1 from coupon_uses where code = $1 and user_id = $2", [code, userId]);
+  if (used.rowCount) throw httpErr(400, "Bu kupondan artıq istifadə etmisiniz.");
+  return { code: c.code, amount: discountFor(c, subtotal) };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   try {
     const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ ok: false, error: "Sifariş üçün daxil olun." });
+    await ensureSchema();
 
     if (req.method === "GET") {
-      await ensureDlv();
       const r = await pool.query(
-        `select id, total, status, items, created_at,
+        `select id, total, status, items, created_at, discount_amount, coupon_code,
                 case when status = 'completed' then delivery_info end as delivery_info
          from orders
          where user_id = $1 order by created_at desc limit 100`, [userId]);
@@ -34,48 +125,67 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "POST") {
       if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: "Forbidden" });
+      const b = body(req);
+      const code = normalizeCode(b.coupon);
+
+      // Kupon cəhdləri (kod tapmaq üçün brute-force-un qarşısı): istifadəçi başına 10 dəqiqədə 30
+      if (code && !(await rateLimit("coupon:" + userId, 30, 600))) {
+        return res.status(429).json({ ok: false, error: "Çox cəhd edildi. Bir az sonra yenidən yoxlayın." });
+      }
+
+      // Önizləmə: səbətdə kuponun endirimini yoxlayır, sifariş yaratmır
+      if (b.preview === true) {
+        const priced = await priceCart(b.items);
+        let disc = 0, applied = null;
+        if (code) {
+          const c = await checkCoupon(pool, code, userId, priced.subtotal, false);
+          disc = c.amount; applied = c.code;
+        }
+        return res.status(200).json({
+          ok: true, subtotal: priced.subtotal, coupon: applied,
+          discount: disc, total: round2(priced.subtotal - disc)
+        });
+      }
+
       // Spam sifarişlərə qarşı: istifadəçi başına saatda 10 sifariş
       if (!(await rateLimit("order:" + userId, 10, 3600))) {
         return res.status(429).json({ ok: false, error: "Çox sayda sifariş göndərdiniz. Bir az sonra yenidən cəhd edin." });
       }
-      const input = body(req).items;
-      if (!Array.isArray(input) || input.length === 0 || input.length > 20) {
-        return res.status(400).json({ ok: false, error: "Səbət boşdur." });
-      }
-      const keys = [...new Set(input.map(i => String((i && i.product_key) || "").slice(0, 100)))];
-      const rows = await pool.query(
-        `select p.product_key, p.name_az, pp.*
-         from site_products p join product_prices pp on pp.product_key = p.product_key
-         where p.active = true and p.product_key = any($1)`, [keys]);
-      const map = new Map(rows.rows.map(r => [r.product_key, r]));
 
-      const items = [];
-      let total = 0;
-      for (const i of input) {
-        const months = Number(i && i.months);
-        const qty = Math.min(10, Math.max(1, parseInt(i && i.qty, 10) || 1));
-        const r = map.get(String((i && i.product_key) || ""));
-        if (!r || !MONTHS.includes(months)) {
-          return res.status(400).json({ ok: false, error: "Səbətdə etibarsız məhsul var." });
+      const priced = await priceCart(b.items);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        let disc = 0, usedCode = null;
+        if (code) {
+          const c = await checkCoupon(client, code, userId, priced.subtotal, true);
+          disc = c.amount; usedCode = c.code;
         }
-        const sale = Number(r[`sale_${months}_price`]);
-        const base = Number(r[`price_${months}_month`]);
-        const unit = r[`sale_${months}_active`] === true && sale > 0 ? sale : base;
-        if (!(unit > 0)) return res.status(400).json({ ok: false, error: "Bu müddət üçün qiymət yoxdur." });
-        items.push({ product_key: r.product_key, name: r.name_az, months, qty, unit_price: Number(unit.toFixed(2)) });
-        total += unit * qty;
+        const total = round2(priced.subtotal - disc);
+        const ins = await client.query(
+          `insert into orders (user_id, total, status, items, coupon_code, discount_amount)
+           values ($1, $2, 'pending', $3::jsonb, $4, $5)
+           returning id, total, status, items, created_at, coupon_code, discount_amount`,
+          [userId, total, JSON.stringify(priced.items), usedCode, disc]);
+        if (usedCode) {
+          await client.query(
+            "insert into coupon_uses (code, user_id, order_id) values ($1, $2, $3)",
+            [usedCode, userId, String(ins.rows[0].id)]);
+          await client.query("update coupons set used_count = used_count + 1 where code = $1", [usedCode]);
+        }
+        await client.query("COMMIT");
+        return res.status(201).json({ ok: true, order: ins.rows[0] });
+      } catch (e) {
+        await client.query("ROLLBACK").catch(function () {});
+        throw e;
+      } finally {
+        client.release();
       }
-
-      const ins = await pool.query(
-        `insert into orders (user_id, total, status, items)
-         values ($1, $2, 'pending', $3::jsonb)
-         returning id, total, status, items, created_at`,
-        [userId, Number(total.toFixed(2)), JSON.stringify(items)]);
-      return res.status(201).json({ ok: true, order: ins.rows[0] });
     }
 
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (e) {
+    if (e && e.status) return res.status(e.status).json({ ok: false, error: e.message });
     console.error("orders:", e);
     return res.status(500).json({ ok: false, error: "Server xətası. Bir az sonra yenidən cəhd edin." });
   }
