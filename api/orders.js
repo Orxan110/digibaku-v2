@@ -1,6 +1,7 @@
 const { pool, getUserId } = require("./_db");
 const { rateLimit, sameOrigin } = require("./_auth");
 const { activeDiscounts, unitPrice } = require("../lib/pricing");
+const { ensureCustomerTables } = require("../lib/customers");
 
 const MONTHS = [1, 2, 3, 6, 12];
 const BAD_COUPON = "Kupon etibarsızdır və ya müddəti bitib.";
@@ -10,6 +11,7 @@ function ensureSchema() {
   if (!schemaReady) {
     schemaReady = (async function () {
       await pool.query("alter table orders add column if not exists delivery_info text");
+      await ensureCustomerTables(pool);
       await pool.query("alter table orders add column if not exists coupon_code text");
       await pool.query("alter table orders add column if not exists discount_amount numeric(10,2) not null default 0");
       // kind: 'percent' (faiz) və ya 'fixed' (sabit AZN). Kodlar həmişə BÖYÜK HƏRFLƏ saxlanılır.
@@ -126,6 +128,10 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "POST") {
       if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: "Forbidden" });
+      const prof = await pool.query("select blocked from customer_profiles where user_id = $1", [userId]);
+      if (prof.rows[0] && prof.rows[0].blocked) {
+        return res.status(403).json({ ok: false, error: "Hesabınız bloklanıb. Dəstək ilə əlaqə saxlayın." });
+      }
       const b = body(req);
       const code = normalizeCode(b.coupon);
 

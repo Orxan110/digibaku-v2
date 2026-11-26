@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { pool } = require("./_db");
 const AUTH = require("./_auth");
 const { ensureDiscountTable } = require("../lib/pricing");
+const { ensureCustomerTables } = require("../lib/customers");
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
@@ -588,6 +589,77 @@ async function inner(req, res) {
     }
     await pool.query("delete from coupons where code = $1", [code]);
     return res.status(200).json({ ok: true });
+  }
+
+  // ================= MÜŞTƏRİ PROFİLİ =================
+  if (req.method === "GET" && action === "customer_detail") {
+    await ensureCustomerTables(pool);
+    const id = String(req.query.id || "");
+    const u = await pool.query('select id, name, email from neon_auth."user" where id = $1', [id]);
+    if (!u.rowCount) return res.status(404).json({ ok: false, error: "Müştəri tapılmadı." });
+    const p = await pool.query("select note, blocked, balance from customer_profiles where user_id = $1", [id]);
+    const o = await pool.query(
+      `select id, total, status, items, created_at, coupon_code, discount_amount
+       from orders where user_id = $1 order by created_at desc limit 200`, [id]);
+    const l = await pool.query(
+      "select amount, reason, created_at from customer_ledger where user_id = $1 order by created_at desc limit 50", [id]);
+    return res.status(200).json({
+      ok: true, user: u.rows[0],
+      profile: p.rows[0] || { note: "", blocked: false, balance: 0 },
+      orders: o.rows, ledger: l.rows
+    });
+  }
+
+  if (req.method === "POST" && action === "customer_save") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const id = String(b.id || "");
+    if (!id) return res.status(400).json({ ok: false, error: "Müştəri göstərilməyib." });
+    const note = String(b.note || "").trim().slice(0, 2000) || null;
+    const blocked = b.blocked === true || b.blocked === "true";
+    await pool.query(
+      `insert into customer_profiles (user_id, note, blocked) values ($1, $2, $3)
+       on conflict (user_id) do update set note = excluded.note, blocked = excluded.blocked, updated_at = now()`,
+      [id, note, blocked]);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "customer_balance") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const id = String(b.id || "");
+    const amount = num(String(b.amount == null ? "" : b.amount).replace(",", "."));
+    // num() mənfi rəqəmi NaN edir, ona görə mənfi məbləğ üçün ayrıca yoxlayırıq
+    const raw = Number(String(b.amount == null ? "" : b.amount).replace(",", "."));
+    if (!id || !Number.isFinite(raw) || raw === 0 || Math.abs(raw) > 100000) {
+      return res.status(400).json({ ok: false, error: "Məbləğ düzgün deyil (0-dan fərqli, maksimum 100000 AZN)." });
+    }
+    const delta = Math.round(raw * 100) / 100;
+    const reason = String(b.reason || "").trim().slice(0, 200) || null;
+    const u = await pool.query('select id from neon_auth."user" where id = $1', [id]);
+    if (!u.rowCount) return res.status(404).json({ ok: false, error: "Müştəri tapılmadı." });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "insert into customer_profiles (user_id, balance) values ($1, 0) on conflict (user_id) do nothing", [id]);
+      const r = await client.query(
+        `update customer_profiles set balance = balance + $2, updated_at = now()
+         where user_id = $1 and balance + $2 >= 0 returning balance`, [id, delta]);
+      if (!r.rowCount) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ ok: false, error: "Balans mənfi ola bilməz." });
+      }
+      await client.query(
+        "insert into customer_ledger (user_id, amount, reason) values ($1, $2, $3)", [id, delta, reason]);
+      await client.query("COMMIT");
+      return res.status(200).json({ ok: true, balance: r.rows[0].balance });
+    } catch (e) {
+      await client.query("ROLLBACK").catch(function () {});
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   // ================= PLANLI ENDİRİM =================
