@@ -70,6 +70,12 @@
     },
     {
       "source": "/assets/(.*)",
+          {
+      "source": "/assets/(admin.*|banner)\\.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
       "headers": [
         {
           "key": "Cache-Control",
