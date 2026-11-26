@@ -3,11 +3,14 @@
   var lang = (window.DB && DB.lang) || "az";
   var TX = {
     az: { add: "Sevimlilərə əlavə et", on: "Sevimlilərdədir", login: "Sevimlilər üçün daxil olun",
-      wish: "Sevimlilərim", empty: "Sevimli məhsulunuz yoxdur.", remove: "Sil", err: "Xəta baş verdi. Yenidən cəhd edin." },
+      wish: "Sevimlilərim", empty: "Sevimli məhsulunuz yoxdur.", remove: "Sil", err: "Xəta baş verdi. Yenidən cəhd edin.",
+      notif: "Bildirişlər", noNotif: "Hazırda bitməyə yaxın abunəniz yoxdur.", ends: "Bitmə tarixi", days: "gün qalıb", renew: "Yenidən sifariş ver" },
     ru: { add: "В избранное", on: "В избранном", login: "Войдите, чтобы сохранять в избранное",
-      wish: "Избранное", empty: "В избранном пока пусто.", remove: "Удалить", err: "Ошибка. Попробуйте ещё раз." },
+      wish: "Избранное", empty: "В избранном пока пусто.", remove: "Удалить", err: "Ошибка. Попробуйте ещё раз.",
+      notif: "Уведомления", noNotif: "Скоро заканчивающихся подписок нет.", ends: "Дата окончания", days: "дн. осталось", renew: "Заказать снова" },
     en: { add: "Add to wishlist", on: "In wishlist", login: "Log in to save to wishlist",
-      wish: "My wishlist", empty: "Your wishlist is empty.", remove: "Remove", err: "Something went wrong. Try again." }
+      wish: "My wishlist", empty: "Your wishlist is empty.", remove: "Remove", err: "Something went wrong. Try again.",
+      notif: "Notifications", noNotif: "No subscriptions ending soon.", ends: "Ends on", days: "days left", renew: "Order again" }
   };
   var t = TX[lang] || TX.az;
 
@@ -127,14 +130,52 @@
     };
   }
 
+  // Bitməyə yaxın abunələr (sayt içində bildiriş)
+  async function renderExpiring(box) {
+    var sec = document.createElement("div");
+    sec.id = "expSection";
+    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
+    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">' + esc(t.notif) + '</h2><div id="expList"></div>';
+    box.appendChild(sec);
+    var listBox = document.getElementById("expList");
+    var h = {};
+    try {
+      if (window.DigiAuth && DigiAuth.getToken) {
+        var tk = await DigiAuth.getToken();
+        if (tk) h.Authorization = "Bearer " + tk;
+      }
+    } catch (e) {}
+    var r;
+    try {
+      r = await fetch("/api/shop?action=expiring", { credentials: "include", headers: h });
+    } catch (e) { r = null; }
+    var data = r && r.ok ? await r.json().catch(function () { return {}; }) : {};
+    var items = (data && data.items) || [];
+    if (!items.length) { listBox.innerHTML = '<p class="muted">' + esc(t.noNotif) + "</p>"; return; }
+    listBox.innerHTML = items.map(function (x) {
+      var left = Math.max(0, Math.ceil((new Date(x.ends_at).getTime() - Date.now()) / 86400000));
+      var when = new Date(x.ends_at).toLocaleDateString("az-AZ");
+      return '<div class="card-box" style="margin-bottom:8px"><b>' + esc(x.name || "") + "</b>" +
+        '<p class="muted" style="font-size:13px;margin:4px 0">' + esc(t.ends) + ": " + esc(when) +
+        " · " + left + " " + esc(t.days) + "</p>" +
+        '<a class="btn" href="products.html">' + esc(t.renew) + "</a></div>";
+    }).join("");
+  }
+
   function initProfile() {
-    var busy = false;
-    // Profil yenidən çəkiləndə bölmə yenidən əlavə olunur
+    var busyW = false, busyE = false;
+    // Profil yenidən çəkiləndə bölmələr yenidən əlavə olunur
     setInterval(function () {
       var box = document.getElementById("profileBox");
-      if (!box || !document.getElementById("logoutBtn") || document.getElementById("wishSection") || busy) return;
-      busy = true;
-      renderProfileWishlist(box).then(function () { busy = false; }, function () { busy = false; });
+      if (!box || !document.getElementById("logoutBtn")) return;
+      if (!document.getElementById("wishSection") && !busyW) {
+        busyW = true;
+        renderProfileWishlist(box).then(function () { busyW = false; }, function () { busyW = false; });
+      }
+      if (!document.getElementById("expSection") && !busyE) {
+        busyE = true;
+        renderExpiring(box).then(function () { busyE = false; }, function () { busyE = false; });
+      }
     }, 500);
   }
 
