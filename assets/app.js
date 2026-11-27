@@ -544,3 +544,23 @@
     loadChatWidget();
   });
 })();
+
+/* DigiBaku — ziyarətçi sayı: hər cihaz gündə bir dəfə (anonim) */
+(function () {
+  try {
+    var KEY = "digibaku_vid";
+    var vid = localStorage.getItem(KEY);
+    if (!vid) {
+      vid = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID().replace(/-/g, "")
+        : (Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+      localStorage.setItem(KEY, vid);
+    }
+    var today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+    if (localStorage.getItem("digibaku_vday") === today) return;
+    fetch("/api/shop?action=visit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vid: vid }), keepalive: true
+    }).then(function (r) { if (r.ok) localStorage.setItem("digibaku_vday", today); }).catch(function () {});
+  } catch (e) {}
+})();
