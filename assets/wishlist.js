@@ -183,7 +183,7 @@
   var BT = {
     az: {
       balTitle: "Balansınız", topTitle: "Balansı necə artırmaq olar", topBtn: "WhatsApp ilə balans artır",
-      hist: "Balans tarixçəsi", more: "Hamısını göstər", less: "Daha az göstər", noOps: "Hələ əməliyyat yoxdur.", note: "Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.",
+      hist: "Balans tarixçəsi", noOps: "Hələ əməliyyat yoxdur.", note: "Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.",
       fail: "Məlumat yüklənmədi.", retry: "Yenidən cəhd et", wa: "Salam, balansımı artırmaq istəyirəm.",
       cashTitle: "Keşbek", cashPct: "keşbek", cashSub: "Hər uğurlu sifarişdən balansınıza qayıdır.", rulesTitle: "Keşbek qaydaları",
       topDef: [
@@ -200,7 +200,7 @@
     },
     ru: {
       balTitle: "Ваш баланс", topTitle: "Как пополнить баланс", topBtn: "Пополнить через WhatsApp",
-      hist: "История баланса", more: "Показать все", less: "Скрыть", noOps: "Операций пока нет.", note: "Вы получаете кешбэк и можете оплачивать заказы балансом.",
+      hist: "История баланса", noOps: "Операций пока нет.", note: "Вы получаете кешбэк и можете оплачивать заказы балансом.",
       fail: "Не удалось загрузить данные.", retry: "Повторить", wa: "Здравствуйте, хочу пополнить баланс.",
       cashTitle: "Кешбэк", cashPct: "кешбэк", cashSub: "С каждого успешного заказа часть суммы возвращается на баланс.", rulesTitle: "Правила кешбэка",
       topDef: [
@@ -217,7 +217,7 @@
     },
     en: {
       balTitle: "Your balance", topTitle: "How to top up your balance", topBtn: "Top up via WhatsApp",
-      hist: "Balance history", more: "Show all", less: "Show less", noOps: "No transactions yet.", note: "You earn cashback and can pay for orders with your balance.",
+      hist: "Balance history", noOps: "No transactions yet.", note: "You earn cashback and can pay for orders with your balance.",
       fail: "Could not load the data.", retry: "Try again", wa: "Hello, I would like to top up my balance.",
       cashTitle: "Cashback", cashPct: "cashback", cashSub: "A part of every successful order returns to your balance.", rulesTitle: "Cashback rules",
       topDef: [
@@ -285,7 +285,7 @@
   async function renderBalance(box) {
     var sec = makeSection("balSection", bt.balTitle, box);
     var out = sec.querySelector(".secBody");
-    var state = { bal: window.DigiBalance ? DigiBalance.cached() : null, ledger: null, info: infoCache, failed: false, all: false };
+    var state = { bal: window.DigiBalance ? DigiBalance.cached() : null, ledger: null, info: infoCache, failed: false };
 
     function draw() {
       if (!document.body.contains(sec)) return;
@@ -297,17 +297,12 @@
       var balTxt = state.bal === null ? "…" : Number(state.bal).toFixed(2) + " AZN";
       var led = "";
       if (state.ledger) {
-        var LIM = 2, items = state.all ? state.ledger : state.ledger.slice(0, LIM);
-        led = items.map(function (x) {
+        led = state.ledger.map(function (x) {
           var pos = Number(x.amount) >= 0;
           return '<div style="border-top:1px solid #262626;padding:8px 0;font-size:13px;display:flex;justify-content:space-between;gap:8px">' +
             '<div>' + esc(x.reason || "—") + '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString(locale())) + "</div></div>" +
             '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
         }).join("");
-        if (state.ledger.length > LIM) {
-          led += '<button class="btn" type="button" data-ledtoggle="1" style="margin-top:8px;width:100%">' +
-            esc(state.all ? bt.less : bt.more + " (" + state.ledger.length + ")") + "</button>";
-        }
       }
       var err = (state.failed && state.bal === null)
         ? '<p class="muted" style="font-size:13px;margin:8px 0">' + esc(bt.fail) + ' <button class="btn" type="button" data-balretry="1">' + esc(bt.retry) + "</button></p>" : "";
@@ -341,7 +336,6 @@
     }
     out.addEventListener("click", function (e) {
       if (e.target && e.target.getAttribute && e.target.getAttribute("data-balretry")) fetchAll();
-      if (e.target && e.target.getAttribute && e.target.getAttribute("data-ledtoggle")) { state.all = !state.all; draw(); }
     });
     if (window.DigiBalance) {
       if (DigiBalance.data()) applyData(DigiBalance.data());

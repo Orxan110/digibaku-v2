@@ -8,19 +8,19 @@
   var lang = (window.DB && DB.lang) || "az";
   var TX = {
     az: { title: "Keşbek və balans", tCash: "Keşbek haqqında", tBal: "Balans necə artırılır", other: "Digər: ", cash: "Keşbek haqqında", top: "Balans necə artırılır", rules: "Qaydalar", pct: "keşbek",
-      sub: "Hər uğurlu sifarişin bir hissəsi balansınıza qayıdır.", bal: "Sizin balansınız", hist: "Balans tarixçəsi", more: "Hamısını göstər", less: "Daha az göstər", none: "Əməliyyat yoxdur.",
+      sub: "Hər uğurlu sifarişin bir hissəsi balansınıza qayıdır.", bal: "Sizin balansınız", hist: "Balans tarixçəsi", none: "Əməliyyat yoxdur.",
       login: "Balansınızı görmək üçün daxil olun", loginBtn: "Daxil ol", wa: "WhatsApp ilə balansı artır", waMsg: "Salam, balansımı artırmaq istəyirəm.",
       fail: "Məlumat yüklənmədi.", retry: "Yenidən cəhd et",
       topDef: ["Balansı artırmaq üçün WhatsApp vasitəsilə bizimlə əlaqə saxlayın.", "Ödənişi etdikdən sonra çeki (skrin) və hesabınızın e-poçtunu göndərin.", "Ödəniş yoxlanıldıqdan sonra məbləğ balansınıza əlavə olunur."],
       cashDef: function (p) { return ["Hər ödənilmiş sifarişdən " + p + "% keşbek balansınıza əlavə olunur.", "Keşbek sifariş \"Ödənilib\" və ya \"Təhvil verildi\" statusuna keçəndə hesablanır.", "Hər sifariş üçün keşbek yalnız bir dəfə hesablanır.", "Balansınızı növbəti sifarişlərdə ödəniş üçün istifadə edə bilərsiniz."]; } },
     ru: { title: "Кешбэк и баланс", tCash: "О кешбэке", tBal: "Как пополнить баланс", other: "Ещё: ", cash: "О кешбэке", top: "Как пополнить баланс", rules: "Правила", pct: "кешбэк",
-      sub: "С каждого успешного заказа часть суммы возвращается на баланс.", bal: "Ваш баланс", hist: "История баланса", more: "Показать все", less: "Скрыть", none: "Операций нет.",
+      sub: "С каждого успешного заказа часть суммы возвращается на баланс.", bal: "Ваш баланс", hist: "История баланса", none: "Операций нет.",
       login: "Войдите, чтобы увидеть баланс", loginBtn: "Войти", wa: "Пополнить через WhatsApp", waMsg: "Здравствуйте, хочу пополнить баланс.",
       fail: "Не удалось загрузить данные.", retry: "Повторить",
       topDef: ["Чтобы пополнить баланс, свяжитесь с нами через WhatsApp.", "После оплаты отправьте чек (скриншот) и e-mail вашего аккаунта.", "После проверки платежа сумма будет зачислена на ваш баланс."],
       cashDef: function (p) { return ["С каждого оплаченного заказа " + p + "% кешбэка зачисляется на ваш баланс.", "Кешбэк начисляется, когда заказ получает статус «Оплачен» или «Выдан».", "Кешбэк за каждый заказ начисляется только один раз.", "Баланс можно использовать для оплаты следующих заказов."]; } },
     en: { title: "Cashback & balance", tCash: "About cashback", tBal: "How to top up balance", other: "See also: ", cash: "About cashback", top: "How to top up your balance", rules: "Rules", pct: "cashback",
-      sub: "A part of every successful order returns to your balance.", bal: "Your balance", hist: "Balance history", more: "Show all", less: "Show less", none: "No transactions yet.",
+      sub: "A part of every successful order returns to your balance.", bal: "Your balance", hist: "Balance history", none: "No transactions yet.",
       login: "Sign in to see your balance", loginBtn: "Sign in", wa: "Top up via WhatsApp", waMsg: "Hello, I would like to top up my balance.",
       fail: "Could not load the data.", retry: "Try again",
       topDef: ["To top up your balance, contact us on WhatsApp.", "After paying, send the receipt (screenshot) and your account e-mail.", "Once the payment is verified, the amount is added to your balance."],
@@ -36,7 +36,7 @@
 
   var info = (window.DigiBalance && DigiBalance.info()) || null;
   var bal = window.DigiBalance ? DigiBalance.cached() : null;
-  var ledger = null, failed = false, showAll = false;
+  var ledger = null, failed = false;
   var hint = /(?:^|; )digibaku_auth=1/.test(document.cookie || "");
   var loggedIn = hint ? true : false;   // cookie ipucu ilə dərhal; sessiya arxa planda təsdiqlənir
   if (window.DigiBalance) { var cd = DigiBalance.data(); if (cd && cd.ledger) { bal = Number(cd.balance || 0); ledger = cd.ledger; } }
@@ -69,17 +69,12 @@
       } else if (loggedIn === true) {
         var led = "";
         if (ledger && ledger.length) {
-          var LIM = 2, items = showAll ? ledger : ledger.slice(0, LIM);
-          led = items.map(function (x) {
+          led = ledger.map(function (x) {
             var pos = Number(x.amount) >= 0;
             return '<div style="border-top:1px solid #262626;padding:8px 0;font-size:13px;display:flex;justify-content:space-between;gap:8px"><div>' + esc(x.reason || "—") +
               '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString(loc())) + "</div></div>" +
               '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
           }).join("");
-          if (ledger.length > LIM) {
-            led += '<button class="btn" type="button" data-ledtoggle="1" style="margin-top:8px;width:100%">' +
-              esc(showAll ? t.less : t.more + " (" + ledger.length + ")") + "</button>";
-          }
         }
         me = '<div class="card-box" style="margin-bottom:12px"><span class="muted" style="font-size:13px">' + esc(t.bal) + '</span><br><b class="price" style="font-size:24px">' +
           (bal === null ? "…" : Number(bal).toFixed(2) + " AZN") + "</b>" +
@@ -126,7 +121,6 @@
 
   box.addEventListener("click", function (e) {
     if (e.target && e.target.getAttribute && e.target.getAttribute("data-retry")) { failed = false; draw(); loadMe(); }
-    if (e.target && e.target.getAttribute && e.target.getAttribute("data-ledtoggle")) { showAll = !showAll; draw(); }
   });
   window.addEventListener("hashchange", function () { draw(); window.scrollTo(0, 0); });
   if (window.DigiBalance) {
