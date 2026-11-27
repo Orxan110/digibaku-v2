@@ -10,7 +10,7 @@
     ".pheart{position:absolute;left:14px;top:14px;width:34px;height:34px;border-radius:50%;" +
     "border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.6);color:#fff;font-size:18px;" +
     "display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;padding:0;line-height:1}" +
-    ".pheart.on{color:var(--red,#ff0000);border-color:var(--red,#ff0000)}";
+    ".pheart.on{color:#e11d48;border-color:#e11d48}";
   document.head.appendChild(style);
 
   async function call(method, body) {
