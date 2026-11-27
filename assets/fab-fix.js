@@ -1,15 +1,8 @@
-/* DigiBaku — məhsul səhifəsində üzən WhatsApp/çat düymələrini alt panelin üstünə qaldırır (hündürlük ölçülür) */
+/* DigiBaku — məhsul səhifəsində üzən WhatsApp/çat düymələrini alt panelin üstünə qaldırır */
 (function () {
-  function place() {
-    var fabs = document.querySelector(".fabs");
-    var bar = document.querySelector(".sticky-bar");
-    if (!fabs) return;
-    if (!bar) { fabs.style.bottom = ""; return; }
-    // Mobildə alt menyu 64px-dir, altındakı alt panel də onun üstündədir
-    var base = window.innerWidth < 900 ? 64 : 0;
-    var h = bar.getBoundingClientRect().height || 0;
-    fabs.style.bottom = (base + h + 12) + "px";
-  }
-  setInterval(place, 400);
-  window.addEventListener("resize", place);
+  var s = document.createElement("style");
+  s.textContent =
+    "@media(max-width:899px){body:has(.sticky-bar) .fabs{bottom:calc(160px + env(safe-area-inset-bottom))}}" +
+    "@media(min-width:900px){body:has(.sticky-bar) .fabs{bottom:112px}}";
+  document.head.appendChild(s);
 })();

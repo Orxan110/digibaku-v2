@@ -179,8 +179,41 @@
     }).join("");
   }
 
+  // Müştərinin balansı (profil bölməsi)
+  async function renderBalance(box) {
+    var sec = document.createElement("div");
+    sec.id = "balSection";
+    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
+    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">Balansınız</h2><div id="balBox"><p class="muted">...</p></div>';
+    box.appendChild(sec);
+    var out = document.getElementById("balBox");
+    var h = {};
+    try {
+      if (window.DigiAuth && DigiAuth.getToken) {
+        var tk = await DigiAuth.getToken();
+        if (tk) h.Authorization = "Bearer " + tk;
+      }
+    } catch (e) {}
+    var data = {};
+    try {
+      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h });
+      data = r.ok ? await r.json().catch(function () { return {}; }) : {};
+    } catch (e) {}
+    var bal = Number(data.balance || 0).toFixed(2);
+    var led = (data.ledger || []).map(function (x) {
+      var pos = Number(x.amount) >= 0;
+      return '<div style="border-top:1px solid #262626;padding:8px 0;font-size:13px;display:flex;justify-content:space-between;gap:8px">' +
+        '<div>' + esc(x.reason || "—") + '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString("az-AZ")) + "</div></div>" +
+        '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
+    }).join("");
+    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(bal) + " AZN</b>" +
+      '<p class="muted" style="font-size:13px;margin-top:6px">Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.</p></div>' +
+      '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">Balans tarixçəsi</b>' +
+      (led || '<p class="muted" style="font-size:13px;margin-top:6px">Hələ əməliyyat yoxdur.</p>') + "</div>";
+  }
+
   function initProfile() {
-    var busyW = false, busyE = false;
+    var busyW = false, busyE = false, busyB = false;
     // Profil yenidən çəkiləndə bölmələr yenidən əlavə olunur
     setInterval(function () {
       var box = document.getElementById("profileBox");
@@ -192,6 +225,10 @@
       if (!document.getElementById("expSection") && !busyE) {
         busyE = true;
         renderExpiring(box).then(function () { busyE = false; }, function () { busyE = false; });
+      }
+      if (!document.getElementById("balSection") && !busyB) {
+        busyB = true;
+        renderBalance(box).then(function () { busyB = false; }, function () { busyB = false; });
       }
     }, 500);
   }

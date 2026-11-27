@@ -76,7 +76,7 @@
       '<div class="card-box" style="margin-bottom:12px"><b>Qeyd və bloklama</b>' +
       '<textarea id="cpNote" rows="3" maxlength="2000" style="' + INP + ';margin-top:8px">' + esc(p.note || "") + "</textarea>" +
       '<label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input id="cpBlocked" type="checkbox"' +
-      (p.blocked ? " checked" : "") + "> Hesabı blokla (sifariş verə bilməz)</label>" +
+      (p.blocked ? " checked" : "") + "> Hesabı blokla (saytda hesab əməliyyatı olmur)</label>" +
       '<button class="btn gold" type="button" data-psave="1">Yadda saxla</button></div>' +
 
       '<div class="card-box" style="margin-bottom:12px"><b>Balans</b>' +

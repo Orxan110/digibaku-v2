@@ -27,7 +27,7 @@
   };
   var t = TX[lang] || TX.az;
   var catalog = [];
-  var state = { name: "", phone: "", couponCode: "", coupon: null, cpErr: "" };
+  var state = { name: "", phone: "", couponCode: "", coupon: null, cpErr: "", pv: null };
 
   function nameOf(p) { return (p.name && (p.name[lang] || p.name.az)) || ""; }
   function validPhone(v) { return /^\+?\d{9,15}$/.test(String(v || "").replace(/[\s\-()]/g, "")); }
@@ -73,20 +73,32 @@
     window.open(link, "_blank", "noopener");
   }
 
-  // Kuponu serverdə yoxlayır (endirim yalnız serverin hesablamasıdır)
-  function previewCoupon(code) {
+  // Önizləmə: kupon endirimi və balans serverdə hesablanır
+  function fetchPreview(code) {
     var btn = document.getElementById("cpBtn");
     if (btn) btn.disabled = true;
     var items = DB.cart.get().map(function (i) { return { product_key: i.product_key, months: i.months, qty: i.qty }; });
-    return DBApi.post("/api/orders", { preview: true, items: items, coupon: code }).then(function (res) {
-      if (res.status === 401) { state.coupon = null; state.cpErr = t.cpLogin; }
-      else if (!res.ok) { state.coupon = null; state.cpErr = (res.data && res.data.error) || t.cpBad; }
-      else {
-        state.coupon = { code: res.data.coupon, discount: Number(res.data.discount), total: Number(res.data.total) };
-        state.cpErr = "";
+    return DBApi.post("/api/orders", { preview: true, items: items, coupon: code || "" }).then(function (res) {
+      if (res.status === 401) { state.coupon = null; state.pv = null; if (code) state.cpErr = t.cpLogin; }
+      else if (!res.ok) {
+        state.pv = null;
+        if (code) { state.coupon = null; state.cpErr = (res.data && res.data.error) || t.cpBad; }
+      } else {
+        state.pv = res.data;
+        if (code) {
+          state.coupon = { code: res.data.coupon, discount: Number(res.data.discount), total: Number(res.data.total) };
+          state.cpErr = "";
+        }
       }
       draw();
     });
+  }
+
+  function previewCoupon(code) { return fetchPreview(code); }
+
+  function refreshPreview() {
+    if (!catalog.length) return;
+    return fetchPreview(state.coupon ? state.coupon.code : "");
   }
 
   function applyCoupon() {
@@ -111,12 +123,13 @@
     }).join("");
 
     var inp = "background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px;font-size:16px;outline:none;width:100%";
-    var cp = state.coupon;
-    var totalHtml = cp
-      ? '<p class="muted" style="margin:14px 0 4px">' + DB.t("total") + ": " + L.total.toFixed(2) + " AZN</p>" +
-        '<p class="muted" style="margin:4px 0">' + t.cpDisc + " (" + esc(cp.code) + "): −" + cp.discount.toFixed(2) + " AZN</p>" +
-        '<p style="margin:8px 0 14px;font-size:18px"><b>' + t.cpPay + ': <span class="price">' + cp.total.toFixed(2) + " AZN</span></b></p>"
-      : '<p style="margin:14px 0;font-size:18px"><b>' + DB.t("total") + ': <span class="price">' + L.total.toFixed(2) + " AZN</span></b></p>";
+    var cp = state.coupon, pv = state.pv;
+    var payable = pv ? Number(pv.total) : L.total;
+    var extra = "";
+    if (cp) extra += '<p class="muted" style="margin:4px 0">' + t.cpDisc + " (" + esc(cp.code) + "): −" + cp.discount.toFixed(2) + " AZN</p>";
+    if (pv && Number(pv.balance_used) > 0) extra += '<p class="muted" style="margin:4px 0">Balansdan: −' + Number(pv.balance_used).toFixed(2) + " AZN</p>";
+    var totalHtml = '<p class="muted" style="margin:14px 0 4px">' + DB.t("total") + ": " + L.total.toFixed(2) + " AZN</p>" + extra +
+      '<p style="margin:8px 0 14px;font-size:18px"><b>' + t.cpPay + ': <span class="price">' + payable.toFixed(2) + " AZN</span></b></p>";
 
     var couponHtml = '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"><label for="cpCode" class="muted" style="font-size:14px">' + t.cpLbl + "</label>" +
       '<div style="display:flex;gap:8px"><input id="cpCode" type="text" autocomplete="off" placeholder="' + esc(t.cpPh) + '" value="' + esc(state.couponCode) + '" style="' + inp + ';flex:1;text-transform:uppercase">' +
@@ -175,12 +188,11 @@
   // Kupon tətbiq olunubsa, səbət dəyişəndə endirim yenidən hesablanır.
   window.addEventListener("cart-changed", function () {
     if (document.hidden || !catalog.length) return;
-    if (state.coupon) previewCoupon(state.coupon.code);
-    else draw();
+    refreshPreview();
   });
 
   DBApi.swr("/api/products", function (d) {
-    if (d) { catalog = d.products || []; draw(); }
+    if (d) { catalog = d.products || []; draw(); refreshPreview(); }
     else if (!catalog.length) { box.innerHTML = '<div class="empty">' + t.fail + "</div>"; }
   });
 

@@ -545,7 +545,7 @@
   });
 })();
 
-/* DigiBaku — ziyarətçi sayı: hər cihaz gündə bir dəfə (anonim) */
+/* DigiBaku — ziyarət qeydi: hər cihaz gündə bir dəfə; giriş edilibsə hesaba da bağlanır */
 (function () {
   try {
     var KEY = "digibaku_vid";
@@ -557,10 +557,49 @@
       localStorage.setItem(KEY, vid);
     }
     var today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
-    if (localStorage.getItem("digibaku_vday") === today) return;
-    fetch("/api/shop?action=visit", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vid: vid }), keepalive: true
-    }).then(function (r) { if (r.ok) localStorage.setItem("digibaku_vday", today); }).catch(function () {});
+    var getTok = (window.DigiAuth && DigiAuth.getToken) ? DigiAuth.getToken() : Promise.resolve(null);
+    Promise.resolve(getTok).then(function (tk) {
+      var state = today + "|" + (tk ? "u" : "g");
+      if (localStorage.getItem("digibaku_vday") === state) return;
+      var h = { "Content-Type": "application/json" };
+      if (tk) h.Authorization = "Bearer " + tk;
+      fetch("/api/shop?action=visit", {
+        method: "POST", headers: h, credentials: "include",
+        body: JSON.stringify({ vid: vid }), keepalive: true
+      }).then(function (r) { if (r.ok) localStorage.setItem("digibaku_vday", state); }).catch(function () {});
+    }).catch(function () {});
   } catch (e) {}
 })();
+
+/* DigiBaku — qeydiyyatlı istifadəçinin balansı bütün səhifələrdə (profil düyməsinin yanında) */
+(function () {
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    if (tries > 40) clearInterval(timer);
+    var links = document.querySelectorAll('a[href="profile.html"]');
+    var link = document.querySelector('#site-header a[href="profile.html"]') || links[0];
+    if (!link || document.getElementById("hdrBal")) return;
+    clearInterval(timer);
+    (async function () {
+      var h = {};
+      try {
+        if (window.DigiAuth && DigiAuth.getToken) {
+          var tk = await DigiAuth.getToken();
+          if (tk) h.Authorization = "Bearer " + tk;
+        }
+      } catch (e) {}
+      var r;
+      try { r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h }); } catch (e) { return; }
+      if (!r.ok) return;
+      var d = await r.json().catch(function () { return {}; });
+      if (document.getElementById("hdrBal")) return;
+      var s = document.createElement("span");
+      s.id = "hdrBal";
+      s.textContent = "Balans: " + Number(d.balance || 0).toFixed(2) + " AZN";
+      s.style.cssText = "font-size:12px;color:#d4af37;margin-left:8px;white-space:nowrap;align-self:center";
+      link.parentNode.insertBefore(s, link.nextSibling);
+    })();
+  }, 300);
+})();
+
