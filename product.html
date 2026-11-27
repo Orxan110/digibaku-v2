@@ -34,5 +34,20 @@
 <script src="assets/product-faq.js"></script>
 <script src="assets/product-similar.js"></script>
 <script src="assets/wishlist.js"></script>
+<script>
+(function () {
+  function place() {
+    var fabs = document.querySelector(".fabs");
+    var bar = document.querySelector(".sticky-bar");
+    if (!fabs) return;
+    if (!bar) { fabs.style.removeProperty("bottom"); return; }
+    var base = window.innerWidth < 900 ? 64 : 0;
+    var h = bar.getBoundingClientRect().height || 0;
+    fabs.style.setProperty("bottom", (base + h + 12) + "px", "important");
+  }
+  setInterval(place, 400);
+  window.addEventListener("resize", place);
+})();
+</script>
 </body>
 </html>
