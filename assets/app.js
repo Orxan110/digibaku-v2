@@ -573,15 +573,46 @@
 
 /* DigiBaku — qeydiyyatlı istifadəçinin balansı bütün səhifələrdə (profil düyməsinin yanında) */
 (function () {
-  var tries = 0;
-  var timer = setInterval(function () {
-    tries++;
-    if (tries > 40) clearInterval(timer);
-    var links = document.querySelectorAll('a[href="profile.html"]');
-    var link = document.querySelector('#site-header a[href="profile.html"]') || links[0];
-    if (!link || document.getElementById("hdrBal")) return;
-    clearInterval(timer);
-    (async function () {
+  var balance = null;      // son məlum balans (null = hələ yüklənməyib)
+  var loading = false;
+  var styled = false;
+
+  function addStyle() {
+    if (styled) return; styled = true;
+    var st = document.createElement("style");
+    st.textContent =
+      "#hdrBal{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid #d4af37;border-radius:999px;" +
+      "color:#d4af37;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none;flex:0 0 auto}" +
+      "#hdrBal .hb-l{display:inline}" +
+      "@media(max-width:560px){#hdrBal{padding:6px 8px;font-size:12px}#hdrBal .hb-l{display:none}}" +
+      "#authLinks{align-items:center}";
+    document.head.appendChild(st);
+  }
+
+  // Balans yazısını "Profilim" düyməsinin yanına qoyur (başlıq yenidən çəkilsə də qaytarır)
+  function place() {
+    if (balance === null) return;
+    var box = document.getElementById("authLinks");
+    if (!box) return;
+    var link = box.querySelector('a[href="profile.html"]');
+    var el = document.getElementById("hdrBal");
+    if (!link) { if (el) el.remove(); return; }   // daxil olmayıb
+    addStyle();
+    if (!el) {
+      el = document.createElement("a");
+      el.id = "hdrBal";
+      el.href = "profile.html#balans";
+      el.title = "Balans";
+    }
+    var html = '<span class="hb-l">Balans:</span> ' + Number(balance).toFixed(2) + " ₼";
+    if (el.innerHTML !== html) el.innerHTML = html;
+    if (el.previousSibling !== link) link.parentNode.insertBefore(el, link.nextSibling);
+  }
+
+  async function load() {
+    if (loading) return;
+    loading = true;
+    try {
       var h = {};
       try {
         if (window.DigiAuth && DigiAuth.getToken) {
@@ -589,17 +620,38 @@
           if (tk) h.Authorization = "Bearer " + tk;
         }
       } catch (e) {}
-      var r;
-      try { r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h }); } catch (e) { return; }
+      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
       if (!r.ok) return;
-      var d = await r.json().catch(function () { return {}; });
-      if (document.getElementById("hdrBal")) return;
-      var s = document.createElement("span");
-      s.id = "hdrBal";
-      s.textContent = "Balans: " + Number(d.balance || 0).toFixed(2) + " AZN";
-      s.style.cssText = "font-size:12px;color:#d4af37;margin-left:8px;white-space:nowrap;align-self:center";
-      link.parentNode.insertBefore(s, link.nextSibling);
-    })();
-  }, 300);
-})();
+      var d = await r.json().catch(function () { return null; });
+      if (!d || d.ok === false) return;
+      balance = Number(d.balance || 0);
+      place();
+    } catch (e) {
+    } finally {
+      loading = false;
+    }
+  }
 
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    var box = document.getElementById("authLinks");
+    if (box && box.querySelector('a[href="profile.html"]')) {
+      if (balance === null && !loading && tries % 6 === 1) load();   // ~hər 2 saniyədən bir yenidən cəhd
+      place();
+    }
+    if (balance !== null && tries > 40) { /* qalır: aşağıdakı müşahidəçi davam edir */ }
+  }, 350);
+
+  // authState() #authLinks-i yenidən yazanda balans silinir — dərhal qaytarırıq
+  function watch() {
+    var box = document.getElementById("authLinks");
+    if (!box) { setTimeout(watch, 300); return; }
+    new MutationObserver(function () { place(); }).observe(box, { childList: true });
+  }
+  watch();
+
+  // Sifarişdən sonra/başqa tabdan qayıdanda balansı yenilə
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && balance !== null) load(); });
+  window.addEventListener("cart-changed", function () { if (balance !== null) load(); });
+})();

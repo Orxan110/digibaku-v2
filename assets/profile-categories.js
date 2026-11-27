@@ -55,7 +55,10 @@
       hesab.appendChild(el);
     });
     box.appendChild(wrap);
-    show(wrap, "hesab");
+    // profile.html#balans kimi keçidlə uyğun kateqoriya açılır
+    var h = (location.hash || "").replace("#", "");
+    var start = CATS.some(function (c) { return c.key === h; }) ? h : "hesab";
+    show(wrap, start);
   }
 
   function sweep(wrap) {

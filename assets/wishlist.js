@@ -195,10 +195,18 @@
       }
     } catch (e) {}
     var data = {};
+    var failed = false;
     try {
-      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h });
+      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
       data = r.ok ? await r.json().catch(function () { return {}; }) : {};
-    } catch (e) {}
+      if (!r.ok) failed = true;
+    } catch (e) { failed = true; }
+    if (failed) {
+      out.innerHTML = '<div class="card-box"><p class="muted">Balansı yükləmək mümkün olmadı.</p>' +
+        '<button class="btn" type="button" id="balRetry">Yenidən cəhd et</button></div>';
+      document.getElementById("balRetry").onclick = function () { sec.remove(); };
+      return;
+    }
     var bal = Number(data.balance || 0).toFixed(2);
     var led = (data.ledger || []).map(function (x) {
       var pos = Number(x.amount) >= 0;
