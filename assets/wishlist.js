@@ -57,65 +57,64 @@
 
   function nameOf(p) { return (p.name && (p.name[lang] || p.name.az)) || p.product_key; }
 
-  /* ---------- Məhsul səhifəsi: ♥ düyməsi ---------- */
+  /* ---------- Məhsul səhifəsi: şəklin sol yuxarısında ♥ düyməsi ---------- */
+  var st0 = document.createElement("style");
+  st0.textContent =
+    ".pd-img{position:relative}" +
+    ".pd-wish{position:absolute;left:12px;top:12px;width:48px;height:48px;border-radius:50%;" +
+    "border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.6);color:#fff;font-size:28px;" +
+    "display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;padding:0;line-height:1}" +
+    ".pd-wish.on{color:#e11d48;border-color:#e11d48}";
+  document.head.appendChild(st0);
+
   function initProductButton() {
     var slug = new URLSearchParams(location.search).get("slug");
     if (!slug) return;
     var busy = false, p = null;
-    // Səhifə yenidən çəkiləndə (məs. müddət dəyişəndə) düymə yenidən əlavə olunur
+    // Səhifə yenidən çəkiləndə düymə yenidən əlavə olunur
     setInterval(async function () {
-      // Ürək alt paneldə (səbət ikonunun yanında) göstərilir, həmişə görünür
-      var anchor = document.getElementById("stickyCart") || document.getElementById("addCartBtn");
-      if (!anchor || document.getElementById("wishBtn") || busy) return;
+      var img = document.querySelector(".pd-img");
+      if (!img || document.getElementById("wishBtn") || busy) return;
       busy = true;
-      if (!p) {
-        var list = await products();
-        p = list.filter(function (x) { return x.slug === slug; })[0] || null;
-      }
-      var anc = document.getElementById("stickyCart") || document.getElementById("addCartBtn");
-      if (p && !document.getElementById("wishBtn") && anc) {
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "wishBtn";
-        if (document.getElementById("stickyCart")) {
-          // Alt paneldə: səbət ikonu ilə eyni kiçik üslub
-          btn.className = "btn btn-out cart-ico";
+      try {
+        if (!p) {
+          var list = await products();
+          p = list.filter(function (x) { return x.slug === slug; })[0] || null;
+        }
+        var target = document.querySelector(".pd-img");
+        if (p && target && !document.getElementById("wishBtn")) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.id = "wishBtn";
+          btn.className = "pd-wish";
           btn.setAttribute("aria-label", t.add);
           btn.title = t.add;
-          anc.parentNode.insertBefore(btn, anc);
-        } else {
-          btn.className = "btn btn-out btn-block";
-          btn.style.marginTop = "8px";
-          anc.parentNode.insertBefore(btn, anc.nextSibling);
-        }
-        paint(btn, false);
-        var st = await call("GET");
-        var on = !!(st.ok && st.data.keys && st.data.keys.indexOf(p.product_key) !== -1);
-        paint(btn, on);
-        btn.onclick = async function () {
-          btn.disabled = true;
-          var r = await call("POST", { product_key: p.product_key, on: !on });
-          btn.disabled = false;
-          if (r.status === 401) { location.href = loginUrl(); return; }
-          if (!r.ok) { alert(t.err); return; }
-          on = !on;
+          target.appendChild(btn);
+          paint(btn, false);
+          var st = await call("GET");
+          var on = !!(st.ok && st.data.keys && st.data.keys.indexOf(p.product_key) !== -1);
           paint(btn, on);
-        };
+          btn.onclick = async function (e) {
+            e.stopPropagation();
+            btn.disabled = true;
+            var r = await call("POST", { product_key: p.product_key, on: !on });
+            btn.disabled = false;
+            if (r.status === 401) { location.href = loginUrl(); return; }
+            if (!r.ok) { alert(t.err); return; }
+            on = !on;
+            paint(btn, on);
+          };
+        }
+      } finally {
+        busy = false;
       }
-      busy = false;
     }, 500);
   }
 
+  // Düymə yalnız ürək ikonudur: boş ♡ və ya qırmızı ♥
   function paint(btn, on) {
-    if (btn.classList.contains("cart-ico")) {
-      // İkon: boş ♡ və ya qırmızı ♥
-      btn.textContent = on ? "♥" : "♡";
-      btn.style.color = on ? "#e11d48" : "";
-      btn.style.borderColor = on ? "#e11d48" : "";
-      btn.style.fontSize = "20px";
-      return;
-    }
-    btn.textContent = (on ? "♥ " : "♡ ") + (on ? t.on : t.add);
+    btn.textContent = on ? "♥" : "♡";
+    btn.classList.toggle("on", on);
   }
 
   /* ---------- Profil: sevimlilər siyahısı ---------- */
