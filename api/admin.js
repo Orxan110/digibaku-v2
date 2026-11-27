@@ -809,8 +809,12 @@ async function inner(req, res) {
   // ================= KEŞBEK =================
   if (req.method === "GET" && action === "cashback") {
     await ensureCustomerTables(pool);
-    const r = await pool.query("select percent from cashback_config where id = 1");
-    return res.status(200).json({ ok: true, percent: r.rows[0] ? Number(r.rows[0].percent) : 0 });
+    const r = await pool.query("select percent, rules from cashback_config where id = 1");
+    return res.status(200).json({
+      ok: true,
+      percent: r.rows[0] ? Number(r.rows[0].percent) : 0,
+      rules: r.rows[0] ? String(r.rows[0].rules || "") : ""
+    });
   }
 
   if (req.method === "POST" && action === "cashback_set") {
@@ -819,9 +823,13 @@ async function inner(req, res) {
     if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
       return res.status(400).json({ ok: false, error: "Keşbek faizi 0 ilə 50 arasında olmalıdır." });
     }
+    const b = body(req);
+    const rules = typeof b.rules === "string" ? b.rules.slice(0, 3000) : null;   // göndərilməyibsə köhnə qayda qalır
     await pool.query(
-      "insert into cashback_config (id, percent) values (1, $1) on conflict (id) do update set percent = excluded.percent",
-      [Math.round(pct * 100) / 100]);
+      `insert into cashback_config (id, percent, rules) values (1, $1, coalesce($2, ''))
+       on conflict (id) do update set percent = excluded.percent,
+         rules = case when $2::text is null then cashback_config.rules else excluded.rules end`,
+      [Math.round(pct * 100) / 100, rules]);
     return res.status(200).json({ ok: true });
   }
 

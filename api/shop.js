@@ -342,10 +342,16 @@ async function balanceGet(req, res) {
          where user_id = $1 order by created_at desc limit 50`, [uid]);
       ledger = l.rows.map(function (x) { return { amount: Number(x.amount), reason: x.reason, created_at: x.created_at }; });
     } catch (e) { console.error("balance ledger:", e && e.message); }
+    let cashback = { percent: 0, rules: "" };
+    try {
+      const c = await pool.query("select percent, rules from cashback_config where id = 1");
+      if (c.rows[0]) cashback = { percent: Number(c.rows[0].percent), rules: String(c.rows[0].rules || "") };
+    } catch (e) { console.error("balance cashback:", e && e.message); }
     return res.status(200).json({
       ok: true,
       balance: r.rows[0] ? Number(r.rows[0].balance) : 0,
-      ledger: ledger
+      ledger: ledger,
+      cashback: cashback
     });
   } catch (e) {
     console.error("balance:", e);
