@@ -1,13 +1,13 @@
 /* DigiBaku — profil səhifəsini kateqoriyalara bölür: Hesab, Balans, Sifarişlər, Sevimlilər, Bildirişlər */
 (function () {
-  var CATS = [
-    { key: "hesab", label: "Hesab" },
-    { key: "balans", label: "Balans" },
-    { key: "kesbek", label: "Keşbek" },
-    { key: "sifaris", label: "Sifarişlər" },
-    { key: "sevimli", label: "Sevimlilər" },
-    { key: "bildiris", label: "Bildirişlər" }
-  ];
+  var LB = {
+    az: ["Hesab", "Balans", "Keşbek", "Sifarişlər", "Sevimlilər", "Bildirişlər"],
+    ru: ["Аккаунт", "Баланс", "Кешбэк", "Заказы", "Избранное", "Уведомления"],
+    en: ["Account", "Balance", "Cashback", "Orders", "Wishlist", "Notifications"]
+  };
+  var lg = (window.DB && DB.lang) || "az";
+  var names = LB[lg] || LB.az;
+  var CATS = ["hesab", "balans", "kesbek", "sifaris", "sevimli", "bildiris"].map(function (k, i) { return { key: k, label: names[i] }; });
   // Kənardan gələn bölmələrin id-ləri və hansı kateqoriyaya aid olduğu
   var PLACE = { wishSection: "sevimli", balSection: "balans", cashSection: "kesbek", expSection: "bildiris" };
 
@@ -60,6 +60,10 @@
     var h = (location.hash || "").replace("#", "");
     var start = CATS.some(function (c) { return c.key === h; }) ? h : "hesab";
     show(wrap, start);
+    window.addEventListener("hashchange", function () {
+      var hh = (location.hash || "").replace("#", "");
+      if (CATS.some(function (c) { return c.key === hh; })) show(wrap, hh);
+    });
   }
 
   function sweep(wrap) {

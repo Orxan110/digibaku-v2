@@ -179,96 +179,196 @@
     }).join("");
   }
 
-  // Müştərinin balansı (profil bölməsi)
-  async function renderBalance(box) {
-    var sec = document.createElement("div");
-    sec.id = "balSection";
-    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
-    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">Balansınız</h2><div id="balBox"><p class="muted">...</p></div>';
-    box.appendChild(sec);
-    var out = document.getElementById("balBox");
-    var h = {};
-    try {
-      if (window.DigiAuth && DigiAuth.getToken) {
-        var tk = await DigiAuth.getToken();
-        if (tk) h.Authorization = "Bearer " + tk;
-      }
-    } catch (e) {}
-    var data = {};
-    var failed = false;
-    try {
-      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
-      data = r.ok ? await r.json().catch(function () { return {}; }) : {};
-      if (!r.ok) failed = true;
-    } catch (e) { failed = true; }
-    if (failed) {
-      out.innerHTML = '<div class="card-box"><p class="muted">Balansı yükləmək mümkün olmadı.</p>' +
-        '<button class="btn" type="button" id="balRetry">Yenidən cəhd et</button></div>';
-      document.getElementById("balRetry").onclick = function () { sec.remove(); };
-      return;
-    }
-    var bal = Number(data.balance || 0).toFixed(2);
-    var led = (data.ledger || []).map(function (x) {
-      var pos = Number(x.amount) >= 0;
-      return '<div style="border-top:1px solid #262626;padding:8px 0;font-size:13px;display:flex;justify-content:space-between;gap:8px">' +
-        '<div>' + esc(x.reason || "—") + '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString("az-AZ")) + "</div></div>" +
-        '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
-    }).join("");
-    var topUp = "";
-    if (!(Number(bal) > 0)) {
-      var wa = "";
-      try { wa = (window.DB && DB.waLink) ? DB.waLink("Salam, balansımı artırmaq istəyirəm.") : ""; } catch (e) {}
-      topUp = '<p style="margin:10px 0 6px"><b>Balansınızı artırın</b></p>' +
-        (wa ? '<a class="btn gold" target="_blank" rel="noopener" href="' + esc(wa) + '">WhatsApp ilə balans artır</a>' : "");
-    }
-    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(bal) + " AZN</b>" + topUp +
-      '<p class="muted" style="font-size:13px;margin-top:6px">Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.</p></div>' +
-      '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">Balans tarixçəsi</b>' +
-      (led || '<p class="muted" style="font-size:13px;margin-top:6px">Hələ əməliyyat yoxdur.</p>') + "</div>";
-  }
-
-  // Keşbek bölməsi: faiz və qaydaları admin paneldən gəlir
-  async function renderCashback(box) {
-    var sec = document.createElement("div");
-    sec.id = "cashSection";
-    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
-    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">Keşbek</h2><div id="cashBox"><p class="muted">...</p></div>';
-    box.appendChild(sec);
-    var out = sec.querySelector("#cashBox");
-    var h = {};
-    try {
-      if (window.DigiAuth && DigiAuth.getToken) {
-        var tk = await DigiAuth.getToken();
-        if (tk) h.Authorization = "Bearer " + tk;
-      }
-    } catch (e) {}
-    var data = null;
-    try {
-      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
-      if (r.ok) data = await r.json().catch(function () { return null; });
-    } catch (e) {}
-    if (!data || !data.cashback) {
-      out.innerHTML = '<div class="card-box"><p class="muted">Keşbek məlumatı yüklənmədi.</p>' +
-        '<button class="btn" type="button" id="cashRetry">Yenidən cəhd et</button></div>';
-      document.getElementById("cashRetry").onclick = function () { sec.remove(); };
-      return;
-    }
-    var pct = Number(data.cashback.percent || 0);
-    var pctTxt = String(pct % 1 === 0 ? pct : pct.toFixed(2));
-    var rules = String(data.cashback.rules || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
-    if (!rules.length) {
-      rules = [
-        "Hər ödənilmiş sifarişdən " + pctTxt + "% keşbek balansınıza əlavə olunur.",
+  // ===== Balans və Keşbek bölmələri (3 dildə; qaydalar admin paneldən gəlir) =====
+  var BT = {
+    az: {
+      balTitle: "Balansınız", topTitle: "Balansı necə artırmaq olar", topBtn: "WhatsApp ilə balans artır",
+      hist: "Balans tarixçəsi", noOps: "Hələ əməliyyat yoxdur.", note: "Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.",
+      fail: "Məlumat yüklənmədi.", retry: "Yenidən cəhd et", wa: "Salam, balansımı artırmaq istəyirəm.",
+      cashTitle: "Keşbek", cashPct: "keşbek", cashSub: "Hər uğurlu sifarişdən balansınıza qayıdır.", rulesTitle: "Keşbek qaydaları",
+      topDef: [
+        "Balansı artırmaq üçün WhatsApp vasitəsilə bizimlə əlaqə saxlayın.",
+        "Ödənişi etdikdən sonra çeki (skrin) və hesabınızın e-poçtunu göndərin.",
+        "Ödəniş yoxlanıldıqdan sonra məbləğ balansınıza əlavə olunur."
+      ],
+      cashDef: function (p) { return [
+        "Hər ödənilmiş sifarişdən " + p + "% keşbek balansınıza əlavə olunur.",
         "Keşbek sifariş \"Ödənilib\" və ya \"Təhvil verildi\" statusuna keçəndə hesablanır.",
         "Hər sifariş üçün keşbek yalnız bir dəfə hesablanır.",
         "Balansınızı növbəti sifarişlərdə ödəniş üçün istifadə edə bilərsiniz."
-      ];
+      ]; }
+    },
+    ru: {
+      balTitle: "Ваш баланс", topTitle: "Как пополнить баланс", topBtn: "Пополнить через WhatsApp",
+      hist: "История баланса", noOps: "Операций пока нет.", note: "Вы получаете кешбэк и можете оплачивать заказы балансом.",
+      fail: "Не удалось загрузить данные.", retry: "Повторить", wa: "Здравствуйте, хочу пополнить баланс.",
+      cashTitle: "Кешбэк", cashPct: "кешбэк", cashSub: "С каждого успешного заказа часть суммы возвращается на баланс.", rulesTitle: "Правила кешбэка",
+      topDef: [
+        "Чтобы пополнить баланс, свяжитесь с нами через WhatsApp.",
+        "После оплаты отправьте чек (скриншот) и e-mail вашего аккаунта.",
+        "После проверки платежа сумма будет зачислена на ваш баланс."
+      ],
+      cashDef: function (p) { return [
+        "С каждого оплаченного заказа " + p + "% кешбэка зачисляется на ваш баланс.",
+        "Кешбэк начисляется, когда заказ получает статус «Оплачен» или «Выдан».",
+        "Кешбэк за каждый заказ начисляется только один раз.",
+        "Баланс можно использовать для оплаты следующих заказов."
+      ]; }
+    },
+    en: {
+      balTitle: "Your balance", topTitle: "How to top up your balance", topBtn: "Top up via WhatsApp",
+      hist: "Balance history", noOps: "No transactions yet.", note: "You earn cashback and can pay for orders with your balance.",
+      fail: "Could not load the data.", retry: "Try again", wa: "Hello, I would like to top up my balance.",
+      cashTitle: "Cashback", cashPct: "cashback", cashSub: "A part of every successful order returns to your balance.", rulesTitle: "Cashback rules",
+      topDef: [
+        "To top up your balance, contact us on WhatsApp.",
+        "After paying, send the receipt (screenshot) and your account e-mail.",
+        "Once the payment is verified, the amount is added to your balance."
+      ],
+      cashDef: function (p) { return [
+        p + "% cashback is added to your balance from every paid order.",
+        "Cashback is credited when the order status becomes \"Paid\" or \"Delivered\".",
+        "Cashback is credited only once per order.",
+        "You can use your balance to pay for future orders."
+      ]; }
     }
-    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(pctTxt) + '% keşbek</b>' +
-      '<p class="muted" style="font-size:13px;margin-top:6px">Hər uğurlu sifarişdən balansınıza qayıdır.</p></div>' +
-      '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">Keşbek qaydaları</b>' +
-      '<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6">' +
-      rules.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></div>";
+  };
+  var bt = BT[lang] || BT.az;
+
+  function lines(txt) {
+    return String(txt || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+  function ul(arr) {
+    return '<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6">' +
+      arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+  }
+  function locale() { return lang === "ru" ? "ru-RU" : lang === "en" ? "en-GB" : "az-AZ"; }
+
+  // Qaydalar hamı üçün açıq endpoint-dən gəlir (balans yüklənməsə də göstərilir)
+  var infoCache = null, infoLoading = null;
+  function loadInfo() {
+    if (infoCache) return Promise.resolve(infoCache);
+    if (infoLoading) return infoLoading;
+    infoLoading = (async function () {
+      for (var i = 0; i < 3; i++) {
+        if (i) await new Promise(function (r) { setTimeout(r, 1200 * i); });
+        try {
+          var r = await fetch("/api/shop?action=cashback_info", { cache: "no-store" });
+          if (r.ok) {
+            var d = await r.json().catch(function () { return null; });
+            if (d && d.cashback) { infoCache = d.cashback; return infoCache; }
+          }
+        } catch (e) {}
+      }
+      return null;
+    })();
+    infoLoading.then(function () { infoLoading = null; }, function () { infoLoading = null; });
+    return infoLoading;
+  }
+  function pick(cb, base) {
+    if (!cb) return [];
+    var key = lang === "az" ? base : base + "_" + lang;
+    if (base === "rules") key = lang === "az" ? "rules" : "rules_" + lang;
+    if (base === "topup") key = "topup_" + lang;
+    return lines(cb[key]);
+  }
+
+  function makeSection(id, title, box) {
+    var sec = document.createElement("div");
+    sec.id = id;
+    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
+    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">' + esc(title) + '</h2><div class="secBody"><p class="muted">...</p></div>';
+    box.appendChild(sec);
+    return sec;
+  }
+
+  // Müştərinin balansı (profil bölməsi)
+  async function renderBalance(box) {
+    var sec = makeSection("balSection", bt.balTitle, box);
+    var out = sec.querySelector(".secBody");
+    var state = { bal: window.DigiBalance ? DigiBalance.cached() : null, ledger: null, info: null, failed: false };
+
+    function draw() {
+      if (!document.body.contains(sec)) return;
+      var cb = state.info;
+      var rules = pick(cb, "topup");
+      if (!rules.length) rules = bt.topDef;
+      var wa = "";
+      try { wa = (window.DB && DB.waLink) ? DB.waLink(bt.wa) : ""; } catch (e) {}
+      var balTxt = state.bal === null ? "…" : Number(state.bal).toFixed(2) + " AZN";
+      var led = "";
+      if (state.ledger) {
+        led = state.ledger.map(function (x) {
+          var pos = Number(x.amount) >= 0;
+          return '<div style="border-top:1px solid #262626;padding:8px 0;font-size:13px;display:flex;justify-content:space-between;gap:8px">' +
+            '<div>' + esc(x.reason || "—") + '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString(locale())) + "</div></div>" +
+            '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
+        }).join("");
+      }
+      var err = (state.failed && state.bal === null)
+        ? '<p class="muted" style="font-size:13px;margin:8px 0">' + esc(bt.fail) + ' <button class="btn" type="button" data-balretry="1">' + esc(bt.retry) + "</button></p>" : "";
+      out.innerHTML =
+        '<div class="card-box"><b class="price" style="font-size:22px">' + esc(balTxt) + "</b>" + err +
+        '<p class="muted" style="font-size:13px;margin-top:6px">' + esc(bt.note) + "</p></div>" +
+        '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">' + esc(bt.topTitle) + "</b>" + ul(rules) +
+        (wa ? '<p style="margin:12px 0 0"><a class="btn gold" target="_blank" rel="noopener" href="' + esc(wa) + '">' + esc(bt.topBtn) + "</a></p>" : "") + "</div>" +
+        '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">' + esc(bt.hist) + "</b>" +
+        (state.ledger === null ? '<p class="muted" style="font-size:13px;margin-top:6px">...</p>'
+          : (led || '<p class="muted" style="font-size:13px;margin-top:6px">' + esc(bt.noOps) + "</p>")) + "</div>";
+    }
+
+    function applyData(d) {
+      if (!d) return;
+      state.bal = Number(d.balance || 0);
+      state.ledger = d.ledger || [];
+      if (d.cashback && !infoCache) { infoCache = d.cashback; }
+      if (infoCache) state.info = infoCache;
+      state.failed = false;
+      draw();
+    }
+    function fetchAll() {
+      state.failed = false; draw();
+      loadInfo().then(function (c) { if (c) { state.info = c; draw(); } });
+      if (window.DigiBalance) {
+        DigiBalance.refresh().then(function (d) {
+          if (d && d.ledger) applyData(d); else { state.failed = true; draw(); }
+        });
+      }
+    }
+    out.addEventListener("click", function (e) {
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-balretry")) fetchAll();
+    });
+    if (window.DigiBalance) {
+      if (DigiBalance.data()) applyData(DigiBalance.data());
+      DigiBalance.on(function (d) { if (document.body.contains(sec)) applyData(d); });
+    }
+    draw();
+    fetchAll();
+  }
+
+  // Keşbek bölməsi: faiz və qaydaları admin paneldən gəlir (3 dildə)
+  async function renderCashback(box) {
+    var sec = makeSection("cashSection", bt.cashTitle, box);
+    var out = sec.querySelector(".secBody");
+    function draw(cb) {
+      if (!document.body.contains(sec)) return;
+      if (!cb) {
+        out.innerHTML = '<div class="card-box"><p class="muted">' + esc(bt.fail) + '</p><button class="btn" type="button" data-cashretry="1">' + esc(bt.retry) + "</button></div>";
+        return;
+      }
+      var pct = Number(cb.percent || 0);
+      var pctTxt = String(pct % 1 === 0 ? pct : pct.toFixed(2));
+      var rules = pick(cb, "rules");
+      if (!rules.length) rules = bt.cashDef(pctTxt);
+      out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(pctTxt) + "% " + esc(bt.cashPct) + "</b>" +
+        '<p class="muted" style="font-size:13px;margin-top:6px">' + esc(bt.cashSub) + "</p></div>" +
+        '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">' + esc(bt.rulesTitle) + "</b>" + ul(rules) + "</div>";
+    }
+    function go() { loadInfo().then(draw); }
+    out.addEventListener("click", function (e) {
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-cashretry")) { out.innerHTML = '<p class="muted">...</p>'; go(); }
+    });
+    go();
   }
 
   function initProfile() {

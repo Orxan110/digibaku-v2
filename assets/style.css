@@ -140,3 +140,9 @@ footer a{display:block;padding:4px 0}
 .cm-admin .cm-btn.wa{color:#04200e;border-color:#25d366}
 .cm-admin .cm-card{background:rgba(0,0,0,.08);border-color:rgba(0,0,0,.35)}
 .cm-admin .cm-card-t em,.cm-admin .cm-card-go{color:#000}
+
+/* Header balans düyməsi */
+.auth-links{align-items:center}
+#hdrBal,.hdr-bal{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid #d4af37;border-radius:999px;color:#d4af37;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none;flex:0 0 auto}
+.hdr-bal .hb-l{display:inline}
+@media(max-width:560px){.hdr-bal{padding:6px 8px;font-size:12px}.hdr-bal .hb-l{display:none}}

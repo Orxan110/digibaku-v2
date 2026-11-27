@@ -1,4 +1,102 @@
 /* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO, şəkil xətası qoruması. */
+/* DigiBaku — balans anbarı: dəyər yadda saxlanır (localStorage), header ilk çəkilişdən balansı göstərir (yanıb-sönmə yoxdur) */
+(function () {
+  var KEY = "digibaku_bal";
+  var L = {
+    az: { lbl: "Balans:", up: "Balansınızı artırın", t: "Balans" },
+    ru: { lbl: "Баланс:", up: "Пополните баланс", t: "Баланс" },
+    en: { lbl: "Balance:", up: "Top up balance", t: "Balance" }
+  };
+  var loading = null, last = null, subs = [];
+
+  function lang() { var l = ""; try { l = localStorage.getItem("digibaku_lang"); } catch (e) {} return L[l] ? l : "az"; }
+  function authed() { try { return /(?:^|; )digibaku_auth=1/.test(document.cookie); } catch (e) { return false; } }
+  function cached() {
+    try { var v = localStorage.getItem(KEY); if (v === null || v === "") return null; var n = Number(v); return isNaN(n) ? null : n; }
+    catch (e) { return null; }
+  }
+  function inner() {
+    var b = cached(); if (b === null) return "";
+    var t = L[lang()];
+    return b > 0 ? '<span class="hb-l">' + t.lbl + "</span> " + b.toFixed(2) + " ₼" : t.up;
+  }
+  // header HTML-nə qoşulan balans düyməsi (authLinksHtml çağırır)
+  function chip() {
+    if (!authed()) return "";
+    var h = inner(); if (!h) return "";
+    return '<a id="hdrBal" class="hdr-bal" href="profile.html#balans" title="' + L[lang()].t + '">' + h + "</a>";
+  }
+  function paint() {
+    var box = document.getElementById("authLinks"); if (!box) return;
+    var link = box.querySelector('a[href="profile.html"]');
+    var el = document.getElementById("hdrBal");
+    var h = authed() ? inner() : "";
+    if (!link || !h) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("a"); el.id = "hdrBal"; el.className = "hdr-bal";
+      el.href = "profile.html#balans"; el.title = L[lang()].t;
+    }
+    if (el.innerHTML !== h) el.innerHTML = h;
+    if (el.previousSibling !== link) link.parentNode.insertBefore(el, link.nextSibling);
+  }
+  function notify() { subs.forEach(function (f) { try { f(last); } catch (e) {} }); }
+
+  async function fetchOnce() {
+    var h = {};
+    try {
+      if (window.DigiAuth && DigiAuth.getToken) {
+        var tk = await DigiAuth.getToken();
+        if (tk) h.Authorization = "Bearer " + tk;
+      }
+    } catch (e) {}
+    var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
+    if (r.status === 401) return { unauth: true };
+    if (!r.ok) return null;
+    var d = await r.json().catch(function () { return null; });
+    return d && d.ok !== false ? d : null;
+  }
+
+  // Balansı serverdən alır; xəta olsa 3 dəfə yenidən cəhd edir. Mövcud dəyəri heç vaxt silmir.
+  function refresh() {
+    if (loading) return loading;
+    loading = (async function () {
+      var delays = [0, 1200, 3000];
+      for (var i = 0; i < delays.length; i++) {
+        if (delays[i]) await new Promise(function (r) { setTimeout(r, delays[i]); });
+        try {
+          var d = await fetchOnce();
+          if (d && d.unauth) break;
+          if (d) {
+            last = d;
+            try { localStorage.setItem(KEY, String(Number(d.balance || 0))); } catch (e) {}
+            paint(); notify();
+            return d;
+          }
+        } catch (e) {}
+      }
+      return last;
+    })();
+    loading.then(function () { loading = null; }, function () { loading = null; });
+    return loading;
+  }
+  function clear() { last = null; try { localStorage.removeItem(KEY); } catch (e) {} paint(); }
+
+  window.DigiBalance = {
+    chip: chip, paint: paint, refresh: refresh, clear: clear, cached: cached,
+    data: function () { return last; },
+    on: function (f) { subs.push(f); }
+  };
+
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && authed()) refresh(); });
+  window.addEventListener("cart-changed", function () { if (authed()) refresh(); });
+  // başlıq yenidən çəkilərsə balans dərhal geri qaytarılır
+  (function watch() {
+    var box = document.getElementById("authLinks");
+    if (!box) { setTimeout(watch, 300); return; }
+    new MutationObserver(function () { paint(); }).observe(box, { childList: true });
+  })();
+})();
+
 (function(){
   // Şəkil xətası: 1) eyni linki (sorğu parametrləri ilə, məs. ?img=ID) gecikmə ilə yenidən yoxla,
   // 2) yalnız faylın uzantısı varsa digər uzantıları yoxla, 3) marka yazılı nişan göstər.
@@ -377,6 +475,7 @@
   function readCookie(n){ try{ var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)")); return m?m[1]:""; }catch(e){ return ""; } }
   function hasAuthHint(){ return readCookie("digibaku_auth")==="1"; }
   function setAuthHint(v){
+    if(!v && window.DigiBalance) DigiBalance.clear();
     try{
       document.cookie = v ? "digibaku_auth=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax"
                           : "digibaku_auth=; Path=/; Max-Age=0; Secure; SameSite=Lax";
@@ -385,7 +484,7 @@
   }
   function authLinksHtml(loggedIn){
     return loggedIn
-      ? '<a class="btn ghost" href="profile.html">'+DB.t("profile")+'</a>'
+      ? '<a class="btn ghost" href="profile.html">'+DB.t("profile")+'</a>'+(window.DigiBalance?DigiBalance.chip():"")
       : '<a class="btn ghost" href="login.html">'+DB.t("login")+'</a><a class="btn gold" href="login.html?mode=register">'+DB.t("register")+'</a>';
   }
 
@@ -523,9 +622,11 @@
     if(r.ok===false) return; // müvəqqəti server xətası: mövcud görünüşü dəyişmə
     if(r.session){
       setAuthHint(true);
-      if(a) a.innerHTML=authLinksHtml(true);
+      if(a && !(a.querySelector('a[href="profile.html"]'))) a.innerHTML=authLinksHtml(true);
+      if(window.DigiBalance) DigiBalance.refresh();
     } else {
       setAuthHint(false);
+      if(window.DigiBalance) DigiBalance.clear();
       if(a) a.innerHTML=authLinksHtml(false);
     }
   }
@@ -569,91 +670,4 @@
       }).then(function (r) { if (r.ok) localStorage.setItem("digibaku_vday", state); }).catch(function () {});
     }).catch(function () {});
   } catch (e) {}
-})();
-
-/* DigiBaku — qeydiyyatlı istifadəçinin balansı bütün səhifələrdə (profil düyməsinin yanında) */
-(function () {
-  var balance = null;      // son məlum balans (null = hələ yüklənməyib)
-  var loading = false;
-  var styled = false;
-
-  function addStyle() {
-    if (styled) return; styled = true;
-    var st = document.createElement("style");
-    st.textContent =
-      "#hdrBal{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid #d4af37;border-radius:999px;" +
-      "color:#d4af37;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none;flex:0 0 auto}" +
-      "#hdrBal .hb-l{display:inline}" +
-      "@media(max-width:560px){#hdrBal{padding:6px 8px;font-size:12px}#hdrBal .hb-l{display:none}}" +
-      "#authLinks{align-items:center}";
-    document.head.appendChild(st);
-  }
-
-  // Balans yazısını "Profilim" düyməsinin yanına qoyur (başlıq yenidən çəkilsə də qaytarır)
-  function place() {
-    if (balance === null) return;
-    var box = document.getElementById("authLinks");
-    if (!box) return;
-    var link = box.querySelector('a[href="profile.html"]');
-    var el = document.getElementById("hdrBal");
-    if (!link) { if (el) el.remove(); return; }   // daxil olmayıb
-    addStyle();
-    if (!el) {
-      el = document.createElement("a");
-      el.id = "hdrBal";
-      el.href = "profile.html#balans";
-      el.title = "Balans";
-    }
-    var html = Number(balance) > 0
-      ? '<span class="hb-l">Balans:</span> ' + Number(balance).toFixed(2) + " ₼"
-      : 'Balansınızı artırın';
-    if (el.innerHTML !== html) el.innerHTML = html;
-    if (el.previousSibling !== link) link.parentNode.insertBefore(el, link.nextSibling);
-  }
-
-  async function load() {
-    if (loading) return;
-    loading = true;
-    try {
-      var h = {};
-      try {
-        if (window.DigiAuth && DigiAuth.getToken) {
-          var tk = await DigiAuth.getToken();
-          if (tk) h.Authorization = "Bearer " + tk;
-        }
-      } catch (e) {}
-      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
-      if (!r.ok) return;
-      var d = await r.json().catch(function () { return null; });
-      if (!d || d.ok === false) return;
-      balance = Number(d.balance || 0);
-      place();
-    } catch (e) {
-    } finally {
-      loading = false;
-    }
-  }
-
-  var tries = 0;
-  var timer = setInterval(function () {
-    tries++;
-    var box = document.getElementById("authLinks");
-    if (box && box.querySelector('a[href="profile.html"]')) {
-      if (balance === null && !loading && tries % 6 === 1) load();   // ~hər 2 saniyədən bir yenidən cəhd
-      place();
-    }
-    if (balance !== null && tries > 40) { /* qalır: aşağıdakı müşahidəçi davam edir */ }
-  }, 350);
-
-  // authState() #authLinks-i yenidən yazanda balans silinir — dərhal qaytarırıq
-  function watch() {
-    var box = document.getElementById("authLinks");
-    if (!box) { setTimeout(watch, 300); return; }
-    new MutationObserver(function () { place(); }).observe(box, { childList: true });
-  }
-  watch();
-
-  // Sifarişdən sonra/başqa tabdan qayıdanda balansı yenilə
-  document.addEventListener("visibilitychange", function () { if (!document.hidden && balance !== null) load(); });
-  window.addEventListener("cart-changed", function () { if (balance !== null) load(); });
 })();
