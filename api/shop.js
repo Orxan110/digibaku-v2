@@ -331,16 +331,21 @@ async function balanceGet(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const user = await getUser(req);
   if (!user) return res.status(401).json({ ok: false, error: "Daxil olun." });
+  const uid = String(user.id);
   try {
-    await ensureCustomerTables(pool);
-    const r = await pool.query("select balance from customer_profiles where user_id = $1", [String(user.id)]);
-    const l = await pool.query(
-      `select amount, reason, created_at from customer_ledger
-       where user_id = $1 order by created_at desc limit 50`, [String(user.id)]);
+    try { await ensureCustomerTables(pool); } catch (e) { console.error("balance ensure:", e && e.message); }
+    const r = await pool.query("select balance from customer_profiles where user_id = $1", [uid]);
+    let ledger = [];
+    try {
+      const l = await pool.query(
+        `select amount, reason, created_at from customer_ledger
+         where user_id = $1 order by created_at desc limit 50`, [uid]);
+      ledger = l.rows.map(function (x) { return { amount: Number(x.amount), reason: x.reason, created_at: x.created_at }; });
+    } catch (e) { console.error("balance ledger:", e && e.message); }
     return res.status(200).json({
       ok: true,
       balance: r.rows[0] ? Number(r.rows[0].balance) : 0,
-      ledger: l.rows.map(function (x) { return { amount: Number(x.amount), reason: x.reason, created_at: x.created_at }; })
+      ledger: ledger
     });
   } catch (e) {
     console.error("balance:", e);
