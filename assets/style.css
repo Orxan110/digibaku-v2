@@ -151,3 +151,7 @@ select.lang{padding:7px 6px;font-size:12px}
 .auth-links{gap:5px;flex:0 0 auto}.auth-links .btn{padding:7px 10px;font-size:13px}
 .burger{width:36px;height:36px;flex:0 0 auto}}
 @media(max-width:380px){.top-row .logo{font-size:16px}.auth-links .btn{padding:6px 8px;font-size:12px}}
+
+/* Balans yazısı həmişə qızılı */
+#hdrBal,#hdrBal .hb-l,.hdr-bal,.hdr-bal .hb-l{color:#d4af37!important}
+#hdrBal,.hdr-bal{border-color:#d4af37!important}
