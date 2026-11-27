@@ -604,7 +604,9 @@
       el.href = "profile.html#balans";
       el.title = "Balans";
     }
-    var html = '<span class="hb-l">Balans:</span> ' + Number(balance).toFixed(2) + " ₼";
+    var html = Number(balance) > 0
+      ? '<span class="hb-l">Balans:</span> ' + Number(balance).toFixed(2) + " ₼"
+      : 'Balansınızı artırın';
     if (el.innerHTML !== html) el.innerHTML = html;
     if (el.previousSibling !== link) link.parentNode.insertBefore(el, link.nextSibling);
   }

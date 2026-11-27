@@ -214,14 +214,65 @@
         '<div>' + esc(x.reason || "—") + '<div class="muted" style="font-size:12px">' + esc(new Date(x.created_at).toLocaleString("az-AZ")) + "</div></div>" +
         '<b style="color:' + (pos ? "#4ade80" : "#f87171") + ';white-space:nowrap">' + (pos ? "+" : "") + Number(x.amount).toFixed(2) + " AZN</b></div>";
     }).join("");
-    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(bal) + " AZN</b>" +
+    var topUp = "";
+    if (!(Number(bal) > 0)) {
+      var wa = "";
+      try { wa = (window.DB && DB.waLink) ? DB.waLink("Salam, balansımı artırmaq istəyirəm.") : ""; } catch (e) {}
+      topUp = '<p style="margin:10px 0 6px"><b>Balansınızı artırın</b></p>' +
+        (wa ? '<a class="btn gold" target="_blank" rel="noopener" href="' + esc(wa) + '">WhatsApp ilə balans artır</a>' : "");
+    }
+    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(bal) + " AZN</b>" + topUp +
       '<p class="muted" style="font-size:13px;margin-top:6px">Keşbek qazanır və balansınızla sifariş ödəyə bilərsiniz.</p></div>' +
       '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">Balans tarixçəsi</b>' +
       (led || '<p class="muted" style="font-size:13px;margin-top:6px">Hələ əməliyyat yoxdur.</p>') + "</div>";
   }
 
+  // Keşbek bölməsi: faiz və qaydaları admin paneldən gəlir
+  async function renderCashback(box) {
+    var sec = document.createElement("div");
+    sec.id = "cashSection";
+    sec.style.cssText = "border-top:1px solid var(--line);padding-top:16px;margin-top:16px";
+    sec.innerHTML = '<h2 style="font-size:17px;margin-bottom:12px">Keşbek</h2><div id="cashBox"><p class="muted">...</p></div>';
+    box.appendChild(sec);
+    var out = sec.querySelector("#cashBox");
+    var h = {};
+    try {
+      if (window.DigiAuth && DigiAuth.getToken) {
+        var tk = await DigiAuth.getToken();
+        if (tk) h.Authorization = "Bearer " + tk;
+      }
+    } catch (e) {}
+    var data = null;
+    try {
+      var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
+      if (r.ok) data = await r.json().catch(function () { return null; });
+    } catch (e) {}
+    if (!data || !data.cashback) {
+      out.innerHTML = '<div class="card-box"><p class="muted">Keşbek məlumatı yüklənmədi.</p>' +
+        '<button class="btn" type="button" id="cashRetry">Yenidən cəhd et</button></div>';
+      document.getElementById("cashRetry").onclick = function () { sec.remove(); };
+      return;
+    }
+    var pct = Number(data.cashback.percent || 0);
+    var pctTxt = String(pct % 1 === 0 ? pct : pct.toFixed(2));
+    var rules = String(data.cashback.rules || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!rules.length) {
+      rules = [
+        "Hər ödənilmiş sifarişdən " + pctTxt + "% keşbek balansınıza əlavə olunur.",
+        "Keşbek sifariş \"Ödənilib\" və ya \"Təhvil verildi\" statusuna keçəndə hesablanır.",
+        "Hər sifariş üçün keşbek yalnız bir dəfə hesablanır.",
+        "Balansınızı növbəti sifarişlərdə ödəniş üçün istifadə edə bilərsiniz."
+      ];
+    }
+    out.innerHTML = '<div class="card-box"><b class="price" style="font-size:20px">' + esc(pctTxt) + '% keşbek</b>' +
+      '<p class="muted" style="font-size:13px;margin-top:6px">Hər uğurlu sifarişdən balansınıza qayıdır.</p></div>' +
+      '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">Keşbek qaydaları</b>' +
+      '<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6">' +
+      rules.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></div>";
+  }
+
   function initProfile() {
-    var busyW = false, busyE = false, busyB = false;
+    var busyW = false, busyE = false, busyB = false, busyC = false;
     // Profil yenidən çəkiləndə bölmələr yenidən əlavə olunur
     setInterval(function () {
       var box = document.getElementById("profileBox");
@@ -237,6 +288,10 @@
       if (!document.getElementById("balSection") && !busyB) {
         busyB = true;
         renderBalance(box).then(function () { busyB = false; }, function () { busyB = false; });
+      }
+      if (!document.getElementById("cashSection") && !busyC) {
+        busyC = true;
+        renderCashback(box).then(function () { busyC = false; }, function () { busyC = false; });
       }
     }, 500);
   }

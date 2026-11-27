@@ -3,12 +3,13 @@
   var CATS = [
     { key: "hesab", label: "Hesab" },
     { key: "balans", label: "Balans" },
+    { key: "kesbek", label: "Keşbek" },
     { key: "sifaris", label: "Sifarişlər" },
     { key: "sevimli", label: "Sevimlilər" },
     { key: "bildiris", label: "Bildirişlər" }
   ];
   // Kənardan gələn bölmələrin id-ləri və hansı kateqoriyaya aid olduğu
-  var PLACE = { wishSection: "sevimli", balSection: "balans", expSection: "bildiris" };
+  var PLACE = { wishSection: "sevimli", balSection: "balans", cashSection: "kesbek", expSection: "bildiris" };
 
   var style = document.createElement("style");
   style.textContent =
