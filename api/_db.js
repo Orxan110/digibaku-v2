@@ -87,7 +87,7 @@ async function bearerUser(token) {
 }
 
 // İstifadəçi: { id, name, email } və ya null
-async function getUser(req) {
+async function getUserRaw(req) {
   const h = req.headers.authorization || "";
   const m = h.match(/^Bearer\s+(.+)$/);
   if (m) {
@@ -95,6 +95,19 @@ async function getUser(req) {
     if (u) return u;
   }
   return cookieUser(req);
+}
+
+// Bloklanmış (ban) hesab: sayta daxil ola bilməz, hesab sorğularına "daxil olmamış" kimi cavab verilir
+async function getUser(req) {
+  const u = await getUserRaw(req);
+  if (!u) return null;
+  try {
+    const r = await pool.query("select blocked from customer_profiles where user_id = $1", [u.id]);
+    if (r.rows[0] && r.rows[0].blocked === true) return null;
+  } catch (e) {
+    // cədvəl hələ yoxdursa ban yoxdur
+  }
+  return u;
 }
 
 async function getUserId(req) {

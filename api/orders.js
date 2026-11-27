@@ -14,6 +14,7 @@ function ensureSchema() {
       await ensureCustomerTables(pool);
       await pool.query("alter table orders add column if not exists coupon_code text");
       await pool.query("alter table orders add column if not exists discount_amount numeric(10,2) not null default 0");
+      await pool.query("alter table orders add column if not exists balance_used numeric(10,2) not null default 0");
       // kind: 'percent' (faiz) və ya 'fixed' (sabit AZN). Kodlar həmişə BÖYÜK HƏRFLƏ saxlanılır.
       await pool.query(`create table if not exists coupons (
         code text primary key,
@@ -119,7 +120,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "GET") {
       const r = await pool.query(
-        `select id, total, status, items, created_at, discount_amount, coupon_code,
+        `select id, total, status, items, created_at, discount_amount, coupon_code, balance_used,
                 case when status = 'completed' then delivery_info end as delivery_info
          from orders
          where user_id = $1 order by created_at desc limit 100`, [userId]);
@@ -148,9 +149,13 @@ module.exports = async function handler(req, res) {
           const c = await checkCoupon(pool, code, userId, priced.subtotal, false);
           disc = c.amount; applied = c.code;
         }
+        const afterCoupon = round2(priced.subtotal - disc);
+        const bal = await pool.query("select balance from customer_profiles where user_id = $1", [userId]);
+        const balance = bal.rows[0] ? Number(bal.rows[0].balance) : 0;
+        const balUsed = round2(Math.min(Math.max(balance, 0), afterCoupon));
         return res.status(200).json({
           ok: true, subtotal: priced.subtotal, coupon: applied,
-          discount: disc, total: round2(priced.subtotal - disc)
+          discount: disc, balance_used: balUsed, total: round2(afterCoupon - balUsed)
         });
       }
 
@@ -168,12 +173,24 @@ module.exports = async function handler(req, res) {
           const c = await checkCoupon(client, code, userId, priced.subtotal, true);
           disc = c.amount; usedCode = c.code;
         }
-        const total = round2(priced.subtotal - disc);
+        // Balans: kupon endirimindən sonra qalan məbləğdən çıxılır (müştərinin balansı varsa)
+        const afterCoupon = round2(priced.subtotal - disc);
+        const bal = await client.query("select balance from customer_profiles where user_id = $1 for update", [userId]);
+        const balance = bal.rows[0] ? Number(bal.rows[0].balance) : 0;
+        const balUsed = round2(Math.min(Math.max(balance, 0), afterCoupon));
+        const total = round2(afterCoupon - balUsed);
         const ins = await client.query(
-          `insert into orders (user_id, total, status, items, coupon_code, discount_amount)
-           values ($1, $2, 'pending', $3::jsonb, $4, $5)
-           returning id, total, status, items, created_at, coupon_code, discount_amount`,
-          [userId, total, JSON.stringify(priced.items), usedCode, disc]);
+          `insert into orders (user_id, total, status, items, coupon_code, discount_amount, balance_used, cashback_done, balance_reverted)
+           values ($1, $2, 'pending', $3::jsonb, $4, $5, $6, false, false)
+           returning id, total, status, items, created_at, coupon_code, discount_amount, balance_used`,
+          [userId, total, JSON.stringify(priced.items), usedCode, disc, balUsed]);
+        if (balUsed > 0) {
+          await client.query(
+            "update customer_profiles set balance = balance - $2, updated_at = now() where user_id = $1", [userId, balUsed]);
+          await client.query(
+            "insert into customer_ledger (user_id, amount, reason) values ($1, $2, $3)",
+            [userId, -balUsed, "Sifariş #" + String(ins.rows[0].id).slice(0, 8)]);
+        }
         if (usedCode) {
           await client.query(
             "insert into coupon_uses (code, user_id, order_id) values ($1, $2, $3)",

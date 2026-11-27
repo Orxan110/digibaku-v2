@@ -326,6 +326,28 @@ async function bansList(req, res) {
   }
 }
 
+// Müştərinin öz balansı (yalnız oxumaq üçün)
+async function balanceGet(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ ok: false, error: "Daxil olun." });
+  try {
+    await ensureCustomerTables(pool);
+    const r = await pool.query("select balance from customer_profiles where user_id = $1", [String(user.id)]);
+    const l = await pool.query(
+      `select amount, reason, created_at from customer_ledger
+       where user_id = $1 order by created_at desc limit 50`, [String(user.id)]);
+    return res.status(200).json({
+      ok: true,
+      balance: r.rows[0] ? Number(r.rows[0].balance) : 0,
+      ledger: l.rows.map(function (x) { return { amount: Number(x.amount), reason: x.reason, created_at: x.created_at }; })
+    });
+  } catch (e) {
+    console.error("balance:", e);
+    return res.status(500).json({ ok: false });
+  }
+}
+
 module.exports = async function handler(req, res) {
   const action = (req.query && req.query.action) || "";
   if (action === "auth") return authProxy(req, res);
@@ -334,6 +356,7 @@ module.exports = async function handler(req, res) {
   if (action === "wish") return wishlist(req, res);
   if (action === "visit") return visit(req, res);
   if (action === "bans" && req.method === "GET") return bansList(req, res);
+  if (action === "balance" && req.method === "GET") return balanceGet(req, res);
   if (action === "expiring" && req.method === "GET") return expiring(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };

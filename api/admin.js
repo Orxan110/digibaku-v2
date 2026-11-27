@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const { pool } = require("./_db");
 const AUTH = require("./_auth");
 const { ensureDiscountTable } = require("../lib/pricing");
-const { ensureCustomerTables } = require("../lib/customers");
+const { ensureCustomerTables, creditCashback, reverseOrder } = require("../lib/customers");
 const { expiringSql } = require("../lib/subs");
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
@@ -163,6 +163,17 @@ async function inner(req, res) {
       "update orders set status = $1, updated_at = now() where id = $2 returning id, status",
       [b.status, String(b.id)]);
     if (!r.rowCount) return res.status(404).json({ ok: false, error: "Sifariş tapılmadı." });
+    try {
+      await ensureCustomerTables(pool);
+      if (b.status === "confirmed" || b.status === "completed") {
+        await creditCashback(pool, b.id);
+      }
+      if (b.status === "cancelled") {
+        await reverseOrder(pool, b.id);
+      }
+    } catch (e) {
+      console.error("balance/cashback:", e);
+    }
     return res.status(200).json({ ok: true, order: r.rows[0] });
   }
 
@@ -792,6 +803,25 @@ async function inner(req, res) {
       await pool.query(
         "insert into banned_ips (ip, reason) values ($1, 'hesab banı') on conflict (ip) do nothing", [lastIp]);
     }
+    return res.status(200).json({ ok: true });
+  }
+
+  // ================= KEŞBEK =================
+  if (req.method === "GET" && action === "cashback") {
+    await ensureCustomerTables(pool);
+    const r = await pool.query("select percent from cashback_config where id = 1");
+    return res.status(200).json({ ok: true, percent: r.rows[0] ? Number(r.rows[0].percent) : 0 });
+  }
+
+  if (req.method === "POST" && action === "cashback_set") {
+    await ensureCustomerTables(pool);
+    const pct = Number(body(req).percent);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
+      return res.status(400).json({ ok: false, error: "Keşbek faizi 0 ilə 50 arasında olmalıdır." });
+    }
+    await pool.query(
+      "insert into cashback_config (id, percent) values (1, $1) on conflict (id) do update set percent = excluded.percent",
+      [Math.round(pct * 100) / 100]);
     return res.status(200).json({ ok: true });
   }
 
