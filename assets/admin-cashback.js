@@ -49,7 +49,15 @@
       topup_az: g("cbTopAz"), topup_ru: g("cbTopRu"), topup_en: g("cbTopEn") } });
     if (r.status === 401) { expired(); return; }
     if (!r.ok) { showMsg(fetchErr(r, "Saxlanmadı.")); return; }
-    showMsg("Keşbek faizi (" + pct + "%), qaydalar və balans artırma təlimatı saxlanıldı.");
+    var ok = false;
+    try {
+      var chk = await fetch("/api/shop?action=cashback_info&_=" + Date.now(), { cache: "no-store" });
+      var cj = await chk.json();
+      ok = !!(cj && cj.cashback && Number(cj.cashback.percent) === pct &&
+        cj.cashback.rules === g("cbRulesAz").slice(0, 3000) && cj.cashback.topup_az === g("cbTopAz").slice(0, 3000));
+    } catch (e2) {}
+    showMsg("Keşbek faizi (" + pct + "%), qaydalar və balans artırma təlimatı saxlanıldı." +
+      (ok ? " ✓ Saytda (wallet.html və profil) dərhal görünür." : " Diqqət: saytdan yoxlama uğursuz oldu, səhifəni yeniləyib yenidən yoxlayın."));
     load();
   });
 

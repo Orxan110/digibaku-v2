@@ -5,13 +5,13 @@
   var TX = {
     az: { login: "Profilə baxmaq üçün", loginLink: "daxil olun", name: "Ad", email: "E-poçt", save: "Yadda saxla",
       nameH: "Ad", emailH: "E-poçt ünvanı", passH: "Şifrəni dəyiş", newEmail: "Yeni e-poçt", cur: "Cari şifrə", nw: "Yeni şifrə (ən azı 8 simvol)",
-      rep: "Yeni şifrə (təkrar)", change: "Şifrəni dəyiş", orders: "Sifarişlərim", logout: "Çıxış", saving: "Yadda saxlanır..." },
+      rep: "Yeni şifrə (təkrar)", bal: "Balans", more: "Keşbek və balans haqqında", change: "Şifrəni dəyiş", orders: "Sifarişlərim", logout: "Çıxış", saving: "Yadda saxlanır..." },
     ru: { login: "Чтобы посмотреть профиль,", loginLink: "войдите", name: "Имя", email: "E-mail", save: "Сохранить",
       nameH: "Имя", emailH: "Адрес e-mail", passH: "Сменить пароль", newEmail: "Новый e-mail", cur: "Текущий пароль", nw: "Новый пароль (минимум 8 символов)",
-      rep: "Новый пароль (повтор)", change: "Сменить пароль", orders: "Мои заказы", logout: "Выйти", saving: "Сохранение..." },
+      rep: "Новый пароль (повтор)", bal: "Баланс", more: "О кешбэке и балансе", change: "Сменить пароль", orders: "Мои заказы", logout: "Выйти", saving: "Сохранение..." },
     en: { login: "To view your profile,", loginLink: "sign in", name: "Name", email: "Email", save: "Save",
       nameH: "Name", emailH: "Email address", passH: "Change password", newEmail: "New email", cur: "Current password", nw: "New password (at least 8 characters)",
-      rep: "New password (repeat)", change: "Change password", orders: "My orders", logout: "Sign out", saving: "Saving..." }
+      rep: "New password (repeat)", bal: "Balance", more: "About cashback & balance", change: "Change password", orders: "My orders", logout: "Sign out", saving: "Saving..." }
   };
   var t = TX[lang] || TX.az;
 
@@ -32,6 +32,7 @@
     box.innerHTML =
       '<p><b>' + esc(t.name) + ':</b> <span id="curName">' + esc(cur.name || "-") + '</span></p>' +
       '<p><b>' + esc(t.email) + ':</b> <span id="curEmail">' + esc(cur.email || "-") + "</span></p>" +
+      '<p><b>' + esc(t.bal) + ':</b> <span id="curBal" class="price">…</span> <a href="wallet.html" style="font-size:13px;margin-left:6px">' + esc(t.more) + "</a></p>" +
       section(t.nameH,
         '<form id="fName" autocomplete="off"><div class="field"><label for="pName">' + esc(t.name) + '</label><input id="pName" type="text" maxlength="80" value="' + esc(cur.name) + '"></div>' +
         msgBox("n") + '<button class="btn gold" type="submit">' + esc(t.save) + "</button></form>") +
@@ -86,4 +87,18 @@
     document.getElementById("logoutBtn").onclick = async function () { if (window.DigiBalance) DigiBalance.clear(); await DigiAuth.logout(); location.replace("index.html"); };
   }
   draw();
+
+  // Balans: əvvəlcə keşdən, sonra serverdən (səhifədə həmişə görünür)
+  function setBal(n) {
+    var el = document.getElementById("curBal");
+    if (el && n !== null && n !== undefined && !isNaN(n)) el.textContent = Number(n).toFixed(2) + " AZN";
+  }
+  if (window.DigiBalance) {
+    setBal(DigiBalance.cached());
+    DigiBalance.on(function (d) { if (d) setBal(d.balance); });
+    DigiBalance.refresh().then(function (d) {
+      if (d) setBal(d.balance);
+      else { var el = document.getElementById("curBal"); if (el && el.textContent === "…") el.textContent = "0.00 AZN"; }
+    });
+  }
 })();

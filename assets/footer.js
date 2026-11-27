@@ -11,7 +11,7 @@
       wa: "WhatsApp-da yaz", chat: "Canlı çat",
       tag: "Netflix, YouTube Premium, ChatGPT, Spotify və digər premium xidmətlər — bir yerdə, sərfəli qiymətə.",
       g1: "Alış-veriş", g2: "Populyar xidmətlər", g3: "Məlumat", g4: "Əlaqə",
-      all: "Bütün məhsullar", cart: "Səbət", orders: "Sifarişlərim", profile: "Profilim",
+      all: "Bütün məhsullar", cb: "Keşbek haqqında", top: "Balans necə artırılır", cart: "Səbət", orders: "Sifarişlərim", profile: "Profilim",
       about: "Haqqımızda", faq: "FAQ", contact: "Əlaqə", rules: "Sifariş və xidmət qaydaları",
       privacy: "Məxfilik siyasəti", terms: "İstifadə şərtləri",
       lWa: "WhatsApp", lPhone: "Telefon", lMail: "E-poçt", lCity: "Ünvan", lHours: "İş saatları",
@@ -22,7 +22,7 @@
       wa: "Написать в WhatsApp", chat: "Онлайн-чат",
       tag: "Netflix, YouTube Premium, ChatGPT, Spotify и другие премиум-сервисы — в одном месте по выгодной цене.",
       g1: "Покупки", g2: "Популярные сервисы", g3: "Информация", g4: "Контакты",
-      all: "Все товары", cart: "Корзина", orders: "Мои заказы", profile: "Профиль",
+      all: "Все товары", cb: "О кешбэке", top: "Как пополнить баланс", cart: "Корзина", orders: "Мои заказы", profile: "Профиль",
       about: "О нас", faq: "FAQ", contact: "Контакты", rules: "Правила заказа и услуг",
       privacy: "Политика конфиденциальности", terms: "Условия использования",
       lWa: "WhatsApp", lPhone: "Телефон", lMail: "E-mail", lCity: "Адрес", lHours: "Часы работы",
@@ -33,7 +33,7 @@
       wa: "Message on WhatsApp", chat: "Live chat",
       tag: "Netflix, YouTube Premium, ChatGPT, Spotify and other premium services — in one place, at fair prices.",
       g1: "Shop", g2: "Popular services", g3: "Information", g4: "Contact",
-      all: "All products", cart: "Cart", orders: "My orders", profile: "Profile",
+      all: "All products", cb: "About cashback", top: "How to top up balance", cart: "Cart", orders: "My orders", profile: "Profile",
       about: "About us", faq: "FAQ", contact: "Contact", rules: "Order & service rules",
       privacy: "Privacy policy", terms: "Terms of use",
       lWa: "WhatsApp", lPhone: "Phone", lMail: "Email", lCity: "Address", lHours: "Working hours",
@@ -124,7 +124,7 @@
             '<a data-f="tt" href="#" target="_blank" rel="noopener" aria-label="TikTok" style="display:none">' + TT + "</a>" +
             '<a data-f="wa" href="#" target="_blank" rel="noopener" aria-label="WhatsApp" style="display:none">' + WA + "</a>" +
           "</div></div>" +
-        group(t.g1, li("products.html", t.all) + li("cart.html", t.cart) + li("orders.html", t.orders) + li("profile.html", t.profile)) +
+        group(t.g1, li("products.html", t.all) + li("cart.html", t.cart) + li("orders.html", t.orders) + li("profile.html", t.profile) + li("wallet.html#kesbek", t.cb) + li("wallet.html#balans", t.top)) +
         group(t.g2, li("products.html?q=Netflix", "Netflix") + li("products.html?q=YouTube", "YouTube Premium") + li("products.html?q=ChatGPT", "ChatGPT") + li("products.html?q=Spotify", "Spotify") + li("products.html?q=Gemini", "Gemini")) +
         group(t.g3, li("about.html", t.about) + li("faq.html", t.faq) + li("contact.html", t.contact) + li("rules.html", t.rules)) +
         group(t.g4,
