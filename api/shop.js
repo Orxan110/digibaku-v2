@@ -267,12 +267,45 @@ async function expiring(req, res) {
   }
 }
 
+// Ziyarətçi sayı: hər cihaz gündə bir dəfə (anonim vid, IP saxlanmır)
+let visitsReady = null;
+function ensureVisitsTable() {
+  if (!visitsReady) {
+    visitsReady = pool.query(`create table if not exists site_visitors (
+        day date not null,
+        visitor_id text not null,
+        primary key (day, visitor_id))`)
+      .catch(function (e) { visitsReady = null; throw e; });
+  }
+  return visitsReady;
+}
+
+async function visit(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ ok: false });
+  try {
+    const b = body(req);
+    const vid = String(b.vid || "");
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(vid)) return res.status(400).json({ ok: false });
+    await ensureVisitsTable();
+    await pool.query(
+      `insert into site_visitors (day, visitor_id)
+       values ((now() at time zone 'Asia/Baku')::date, $1)
+       on conflict do nothing`, [vid]);
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error("visit:", e);
+    return res.status(500).json({ ok: false });
+  }
+}
+
 module.exports = async function handler(req, res) {
   const action = (req.query && req.query.action) || "";
   if (action === "auth") return authProxy(req, res);
   if (action === "extra" && req.method === "GET") return extra(req, res);
   if (action === "review") return review(req, res);
   if (action === "wish") return wishlist(req, res);
+  if (action === "visit") return visit(req, res);
   if (action === "expiring" && req.method === "GET") return expiring(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };

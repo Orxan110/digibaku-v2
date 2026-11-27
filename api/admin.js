@@ -686,6 +686,23 @@ async function inner(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ================= ZİYARƏTÇİLƏR =================
+  if (req.method === "GET" && action === "visits") {
+    await pool.query(`create table if not exists site_visitors (
+        day date not null,
+        visitor_id text not null,
+        primary key (day, visitor_id))`);
+    const today = await pool.query(
+      "select count(*)::int as n from site_visitors where day = (now() at time zone 'Asia/Baku')::date");
+    const month = await pool.query(
+      "select count(distinct visitor_id)::int as n from site_visitors where day >= date_trunc('month', now() at time zone 'Asia/Baku')::date");
+    const days = await pool.query(
+      `select to_char(day, 'YYYY-MM-DD') as day, count(*)::int as n from site_visitors
+       where day > (now() at time zone 'Asia/Baku')::date - 30
+       group by day order by day desc`);
+    return res.status(200).json({ ok: true, today: today.rows[0].n, month: month.rows[0].n, days: days.rows });
+  }
+
   // ================= PLANLI ENDİRİM =================
   if (req.method === "GET" && action === "discounts") {
     await ensureDiscountTable(pool);
