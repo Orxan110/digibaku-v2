@@ -19,27 +19,33 @@
       errName: "Ad daxil edin.", errPhone: "Düzgün WhatsApp nömrəsi daxil edin.", noImg: "Şəkil yoxdur",
       sale: "Endirim", waIntro: "Salam, sifariş vermək istəyirəm.", waProduct: "Məhsul", waPlan: "Müddət",
       waPrice: "Qiymət", waName: "Ad", waPhone: "Nömrə", stickyTo: "Ümumi", noWa: "WhatsApp nömrəsi hələ təyin olunmayıb.",
-      addCart: "Səbətə at", added: "Səbətə əlavə olundu", goCart: "Səbətə keç" },
+      addCart: "Səbətə at", added: "Səbətə əlavə olundu", goCart: "Səbətə keç",
+      siteOrder: "Sayt üzərindən sifariş ver", cpLbl: "Promo kod", cpPh: "Məs: YENI10", cpBtn: "Tətbiq et", cpClear: "Kuponu ləğv et",
+      cpDisc: "Endirim", cpPay: "Ödəniləcək", cpEmpty: "Promo kodu daxil edin.", cpLogin: "Kuponu tətbiq etmək üçün daxil olun.", cpBad: "Kupon etibarsızdır.", cpOk: "Kupon tətbiq olundu", fail: "Sifariş yaradılmadı." },
     ru: { back: "← Назад к товарам", notFound: "Товар не найден.", loadErr: "Не удалось загрузить товар.",
       plans: "Выберите срок", month: "мес.", nameLbl: "Ваше имя", namePh: "Имя и фамилия",
       phoneLbl: "Ваш номер WhatsApp", phonePh: "+994 50 000 00 00", orderBtn: "Заказать в WhatsApp",
       errName: "Введите имя.", errPhone: "Введите правильный номер WhatsApp.", noImg: "Нет изображения",
       sale: "Скидка", waIntro: "Здравствуйте, хочу оформить заказ.", waProduct: "Товар", waPlan: "Срок",
       waPrice: "Цена", waName: "Имя", waPhone: "Номер", stickyTo: "Итого", noWa: "Номер WhatsApp ещё не задан.",
-      addCart: "В корзину", added: "Добавлено в корзину", goCart: "Перейти в корзину" },
+      addCart: "В корзину", added: "Добавлено в корзину", goCart: "Перейти в корзину",
+      siteOrder: "Заказать через сайт", cpLbl: "Промокод", cpPh: "Напр: YENI10", cpBtn: "Применить", cpClear: "Убрать купон",
+      cpDisc: "Скидка", cpPay: "К оплате", cpEmpty: "Введите промокод.", cpLogin: "Войдите, чтобы применить купон.", cpBad: "Промокод недействителен.", cpOk: "Купон применён", fail: "Не удалось оформить заказ." },
     en: { back: "← Back to products", notFound: "Product not found.", loadErr: "Product could not be loaded.",
       plans: "Choose duration", month: "mo", nameLbl: "Your name", namePh: "Full name",
       phoneLbl: "Your WhatsApp number", phonePh: "+994 50 000 00 00", orderBtn: "Order via WhatsApp",
       errName: "Please enter your name.", errPhone: "Please enter a valid WhatsApp number.", noImg: "No image",
       sale: "Sale", waIntro: "Hello, I would like to place an order.", waProduct: "Product", waPlan: "Duration",
       waPrice: "Price", waName: "Name", waPhone: "Number", stickyTo: "Total", noWa: "WhatsApp number is not set yet.",
-      addCart: "Add to cart", added: "Added to cart", goCart: "Go to cart" }
+      addCart: "Add to cart", added: "Added to cart", goCart: "Go to cart",
+      siteOrder: "Order through website", cpLbl: "Promo code", cpPh: "e.g. YENI10", cpBtn: "Apply", cpClear: "Remove coupon",
+      cpDisc: "Discount", cpPay: "To pay", cpEmpty: "Enter a promo code.", cpLogin: "Log in to apply a coupon.", cpBad: "Invalid coupon.", cpOk: "Coupon applied", fail: "Order could not be created." }
   };
 
   var lang = (window.DB && DB.lang) || "az";
   var t = TX[lang] || TX.az;
   var slug = new URLSearchParams(location.search).get("slug") || "";
-  var state = { product: null, months: null, name: "", phone: "" };
+  var state = { product: null, months: null, name: "", phone: "", couponCode: "", coupon: null, cpErr: "" };
 
   var css = ".pd-grid{display:grid;gap:18px;margin:18px 0}" +
     "@media(min-width:900px){.pd-grid{grid-template-columns:1fr 1fr;align-items:start}}" +
@@ -74,7 +80,10 @@
     ".cart-ico{width:46px;height:44px;padding:0;font-size:20px;flex:0 0 auto}" +
     ".cart-msg{min-height:20px;margin:10px 0 0;font-size:14px;color:#86efac}" +
     ".cart-msg a{color:var(--gold);text-decoration:underline;margin-left:6px}" +
-    ".pd-gap{height:10px}";
+    ".pd-gap{height:10px}" +
+    ".cp-row{display:flex;gap:8px}.cp-row input{flex:1;min-width:0;text-transform:uppercase}" +
+    ".cp-info{font-size:14px;color:#86efac;margin:6px 0 0}" +
+    ".fabs{z-index:70!important}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
@@ -107,9 +116,10 @@
       t.waProduct + ": " + nameOf(p),
       t.waPlan + ": " + cur.months + " " + t.month,
       t.waPrice + ": " + cur.price.toFixed(2) + " AZN",
+      state.coupon ? (t.cpDisc + " (" + state.coupon.code + "): −" + state.coupon.discount.toFixed(2) + " AZN\n" + t.cpPay + ": " + state.coupon.total.toFixed(2) + " AZN") : null,
       t.waName + ": " + state.name.trim(),
       t.waPhone + ": " + state.phone.trim()
-    ].join("\n");
+    ].filter(function (x) { return x !== null; }).join("\n");
   }
 
   function orderViaWhatsApp() {
@@ -121,6 +131,45 @@
     var link = (window.DB && DB.waLink) ? DB.waLink(waText(p, cur)) : "#";
     if (link === "#") { err.textContent = t.noWa; return; }
     window.open(link, "_blank", "noopener");
+  }
+
+  function itemsPayload() {
+    return [{ product_key: state.product.product_key, months: state.months, qty: 1 }];
+  }
+  function applyCoupon() {
+    var code = String(state.couponCode || "").trim().toUpperCase();
+    state.couponCode = code;
+    if (!code) { state.cpErr = t.cpEmpty; state.coupon = null; updateCoupon(); return; }
+    var btn = document.getElementById("cpBtn"); if (btn) btn.disabled = true;
+    DBApi.post("/api/orders", { preview: true, items: itemsPayload(), coupon: code }).then(function (res) {
+      if (res.status === 401) { state.coupon = null; state.cpErr = t.cpLogin; }
+      else if (!res.ok) { state.coupon = null; state.cpErr = (res.data && res.data.error) || t.cpBad; }
+      else {
+        state.coupon = { code: res.data.coupon || code, discount: Number(res.data.discount) || 0, total: Number(res.data.total) };
+        state.cpErr = "";
+      }
+      updateCoupon();
+    }).catch(function () { state.coupon = null; state.cpErr = t.cpBad; updateCoupon(); });
+  }
+  function clearCoupon() { state.coupon = null; state.couponCode = ""; state.cpErr = ""; draw(); }
+  function updateCoupon() {
+    var btn = document.getElementById("cpBtn"); if (btn) btn.disabled = false;
+    draw();
+  }
+  function orderViaSite() {
+    var p = state.product; if (!p) return;
+    var err = document.getElementById("orderErr");
+    var btn = document.getElementById("siteOrderBtn"); if (btn) btn.disabled = true;
+    DBApi.post("/api/orders", { items: itemsPayload(), coupon: state.coupon ? state.coupon.code : "" }).then(function (res) {
+      if (btn) btn.disabled = false;
+      if (res.status === 401) { location.href = "login.html?next=" + encodeURIComponent(location.pathname + location.search); return; }
+      if (!res.ok) {
+        if (state.coupon) { state.coupon = null; state.cpErr = (res.data && res.data.error) || t.cpBad; draw(); }
+        var e2 = document.getElementById("orderErr"); if (e2) e2.textContent = (res.data && res.data.error) || t.fail;
+        return;
+      }
+      location.href = "orders.html?created=1";
+    }).catch(function () { if (btn) btn.disabled = false; if (err) err.textContent = t.fail; });
   }
 
   function addToCart() {
@@ -204,10 +253,16 @@
           '<div class="order-box" id="orderBox">' +
             '<div class="fld"><label for="fName">' + esc(t.nameLbl) + '</label><input id="fName" type="text" placeholder="' + esc(t.namePh) + '" value="' + esc(state.name) + '"></div>' +
             '<div class="fld"><label for="fPhone">' + esc(t.phoneLbl) + '</label><input id="fPhone" type="tel" placeholder="' + esc(t.phonePh) + '" value="' + esc(state.phone) + '"></div>' +
+            '<div class="fld"><label for="cpCode">' + esc(t.cpLbl) + '</label><div class="cp-row"><input id="cpCode" type="text" autocomplete="off" placeholder="' + esc(t.cpPh) + '" value="' + esc(state.couponCode) + '">' +
+              '<button type="button" class="btn" id="cpBtn">' + esc(t.cpBtn) + '</button></div>' +
+              (state.coupon ? '<div class="cp-info">✓ ' + esc(t.cpOk) + ' (' + esc(state.coupon.code) + '): −' + state.coupon.discount.toFixed(2) + ' AZN · ' + esc(t.cpPay) + ': <b>' + state.coupon.total.toFixed(2) + ' AZN</b> <a href="#" id="cpClear" style="color:var(--gold);margin-left:6px">' + esc(t.cpClear) + '</a></div>' : '') +
+              '<div class="err-txt" id="cpErr" style="margin:6px 0 0">' + esc(state.cpErr) + '</div></div>' +
             '<div class="err-txt" id="orderErr"></div>' +
             '<button type="button" class="btn btn-out btn-block" id="addCartBtn">🛒 ' + esc(t.addCart) + "</button>" +
             '<div class="pd-gap"></div>' +
             '<button type="button" class="btn gold btn-block" id="orderBtn">' + esc(t.orderBtn) + "</button>" +
+            '<div class="pd-gap"></div>' +
+            '<button type="button" class="btn gold btn-block" id="siteOrderBtn">' + esc(t.siteOrder) + "</button>" +
             '<div class="cart-msg" id="cartMsg"></div>' +
           "</div>" +
         "</div>" +
@@ -217,12 +272,19 @@
       im.addEventListener("error", function () { im.replaceWith(document.createTextNode(im.alt)); });
     });
     box.querySelectorAll("[data-m]").forEach(function (b) {
-      b.onclick = function () { state.months = Number(b.getAttribute("data-m")); draw(); };
+      b.onclick = function () { state.months = Number(b.getAttribute("data-m")); state.coupon = null; state.cpErr = ""; draw(); };
     });
     document.getElementById("fName").oninput = function (e) { state.name = e.target.value; };
     document.getElementById("fPhone").oninput = function (e) { state.phone = e.target.value; };
     document.getElementById("orderBtn").onclick = orderViaWhatsApp;
     document.getElementById("addCartBtn").onclick = addToCart;
+    document.getElementById("siteOrderBtn").onclick = orderViaSite;
+    var cpIn = document.getElementById("cpCode");
+    cpIn.oninput = function (e) { state.couponCode = e.target.value; };
+    cpIn.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } };
+    document.getElementById("cpBtn").onclick = applyCoupon;
+    var cpc = document.getElementById("cpClear");
+    if (cpc) cpc.onclick = function (e) { e.preventDefault(); clearCoupon(); };
 
     bar.style.display = "";
     bar.className = "sticky-bar";
@@ -274,6 +336,19 @@
       } catch (e) { showErr(e); }
     });
   }
+
+  // Üzən çat/WhatsApp düymələri alt panelin üstündə qalsın (hər iki ikon görünsün)
+  function placeFabs() {
+    var fabs = document.querySelector(".fabs");
+    var b = document.querySelector(".sticky-bar");
+    if (!fabs) return;
+    if (!b || b.style.display === "none") { fabs.style.removeProperty("bottom"); return; }
+    var base = window.innerWidth < 900 ? 64 : 0;
+    var h = b.getBoundingClientRect().height || 0;
+    fabs.style.setProperty("bottom", "calc(" + (base + h + 14) + "px + env(safe-area-inset-bottom))", "important");
+  }
+  setInterval(placeFabs, 300);
+  window.addEventListener("resize", placeFabs);
 
   init();
 })();
