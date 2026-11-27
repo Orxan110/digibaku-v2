@@ -326,6 +326,27 @@ async function bansList(req, res) {
   }
 }
 
+// Keşbek faizi, qaydalar və balans artırma təlimatı (3 dildə) — hamı üçün açıq
+async function cashbackInfoData() {
+  const out = { percent: 0, rules: "", rules_ru: "", rules_en: "", topup_az: "", topup_ru: "", topup_en: "" };
+  try {
+    try { await ensureCustomerTables(pool); } catch (e) { console.error("cashback ensure:", e && e.message); }
+    const c = await pool.query(
+      "select percent, rules, rules_ru, rules_en, topup_az, topup_ru, topup_en from cashback_config where id = 1");
+    const x = c.rows[0];
+    if (x) {
+      out.percent = Number(x.percent);
+      ["rules", "rules_ru", "rules_en", "topup_az", "topup_ru", "topup_en"].forEach(function (k) { out[k] = String(x[k] || ""); });
+    }
+  } catch (e) { console.error("cashback info:", e); }
+  return out;
+}
+
+async function cashbackInfoGet(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).json({ ok: true, cashback: await cashbackInfoData() });
+}
+
 // Müştərinin öz balansı (yalnız oxumaq üçün)
 async function balanceGet(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -342,11 +363,7 @@ async function balanceGet(req, res) {
          where user_id = $1 order by created_at desc limit 50`, [uid]);
       ledger = l.rows.map(function (x) { return { amount: Number(x.amount), reason: x.reason, created_at: x.created_at }; });
     } catch (e) { console.error("balance ledger:", e && e.message); }
-    let cashback = { percent: 0, rules: "" };
-    try {
-      const c = await pool.query("select percent, rules from cashback_config where id = 1");
-      if (c.rows[0]) cashback = { percent: Number(c.rows[0].percent), rules: String(c.rows[0].rules || "") };
-    } catch (e) { console.error("balance cashback:", e && e.message); }
+    const cashback = await cashbackInfoData();
     return res.status(200).json({
       ok: true,
       balance: r.rows[0] ? Number(r.rows[0].balance) : 0,
@@ -368,6 +385,7 @@ module.exports = async function handler(req, res) {
   if (action === "visit") return visit(req, res);
   if (action === "bans" && req.method === "GET") return bansList(req, res);
   if (action === "balance" && req.method === "GET") return balanceGet(req, res);
+  if (action === "cashback_info" && req.method === "GET") return cashbackInfoGet(req, res);
   if (action === "expiring" && req.method === "GET") return expiring(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };

@@ -809,27 +809,37 @@ async function inner(req, res) {
   // ================= KEŞBEK =================
   if (req.method === "GET" && action === "cashback") {
     await ensureCustomerTables(pool);
-    const r = await pool.query("select percent, rules from cashback_config where id = 1");
+    const r = await pool.query(
+      "select percent, rules, rules_ru, rules_en, topup_az, topup_ru, topup_en from cashback_config where id = 1");
+    const x = r.rows[0] || {};
     return res.status(200).json({
       ok: true,
-      percent: r.rows[0] ? Number(r.rows[0].percent) : 0,
-      rules: r.rows[0] ? String(r.rows[0].rules || "") : ""
+      percent: x.percent != null ? Number(x.percent) : 0,
+      rules: String(x.rules || ""), rules_ru: String(x.rules_ru || ""), rules_en: String(x.rules_en || ""),
+      topup_az: String(x.topup_az || ""), topup_ru: String(x.topup_ru || ""), topup_en: String(x.topup_en || "")
     });
   }
 
   if (req.method === "POST" && action === "cashback_set") {
     await ensureCustomerTables(pool);
-    const pct = Number(body(req).percent);
+    const b = body(req);
+    const pct = Number(b.percent);
     if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
       return res.status(400).json({ ok: false, error: "Keşbek faizi 0 ilə 50 arasında olmalıdır." });
     }
-    const b = body(req);
-    const rules = typeof b.rules === "string" ? b.rules.slice(0, 3000) : null;   // göndərilməyibsə köhnə qayda qalır
+    // göndərilməyən mətn sahəsi köhnə qiymətini saxlayır
+    const f = function (k) { return typeof b[k] === "string" ? b[k].slice(0, 3000) : null; };
     await pool.query(
-      `insert into cashback_config (id, percent, rules) values (1, $1, coalesce($2, ''))
+      `insert into cashback_config (id, percent, rules, rules_ru, rules_en, topup_az, topup_ru, topup_en)
+       values (1, $1, coalesce($2, ''), coalesce($3, ''), coalesce($4, ''), coalesce($5, ''), coalesce($6, ''), coalesce($7, ''))
        on conflict (id) do update set percent = excluded.percent,
-         rules = case when $2::text is null then cashback_config.rules else excluded.rules end`,
-      [Math.round(pct * 100) / 100, rules]);
+         rules = case when $2::text is null then cashback_config.rules else excluded.rules end,
+         rules_ru = case when $3::text is null then cashback_config.rules_ru else excluded.rules_ru end,
+         rules_en = case when $4::text is null then cashback_config.rules_en else excluded.rules_en end,
+         topup_az = case when $5::text is null then cashback_config.topup_az else excluded.topup_az end,
+         topup_ru = case when $6::text is null then cashback_config.topup_ru else excluded.topup_ru end,
+         topup_en = case when $7::text is null then cashback_config.topup_en else excluded.topup_en end`,
+      [Math.round(pct * 100) / 100, f("rules"), f("rules_ru"), f("rules_en"), f("topup_az"), f("topup_ru"), f("topup_en")]);
     return res.status(200).json({ ok: true });
   }
 
