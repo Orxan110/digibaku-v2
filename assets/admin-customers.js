@@ -81,9 +81,11 @@
 
       '<div class="card-box" style="margin-bottom:12px"><b>Balans</b>' +
       '<div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:8px">' +
-      '<input id="balAmt" type="number" step="0.01" placeholder="Məbləğ (məs: 10 və ya -5)" style="' + INP + '">' +
+      '<input id="balAmt" type="text" inputmode="decimal" placeholder="Məbləğ (məs: 10)" style="' + INP + '">' +
       '<input id="balReason" placeholder="Səbəb (məs: kompensasiya)" maxlength="200" style="' + INP + '"></div>' +
-      '<button class="btn gold" type="button" data-bal="1" style="margin-top:8px">Tətbiq et</button>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+      '<button class="btn gold" type="button" data-bal="add">+ Artır</button>' +
+      '<button class="btn" type="button" data-bal="sub" style="color:#f87171;border-color:#f87171">− Azalt</button></div>' +
       '<div style="margin-top:12px">' + ledger + "</div></div>" +
 
       '<div class="card-box"><b>Sifarişlər (' + d.orders.length + ")</b>" + orders + "</div>";
@@ -118,8 +120,12 @@
     }
     if (t.getAttribute("data-bal") && CURRENT) {
       showMsg("");
+      var mode = t.getAttribute("data-bal");
+      var amt = Math.abs(Number(String(document.getElementById("balAmt").value || "").replace(",", ".").replace("-", "")));
+      if (!isFinite(amt) || amt <= 0) { showMsg("Məbləği düzgün yazın (0-dan böyük)."); return; }
+      if (mode === "sub" && !confirm(amt.toFixed(2) + " AZN balansdan çıxılsın?")) return;
       var r2 = await api("/api/admin?action=customer_balance", { method: "POST", body: {
-        id: CURRENT, amount: document.getElementById("balAmt").value,
+        id: CURRENT, amount: (mode === "sub" ? -amt : amt),
         reason: document.getElementById("balReason").value } });
       if (r2.status === 401) { expired(); return; }
       if (!r2.ok) { showMsg(fetchErr(r2, "Balans dəyişmədi.")); return; }
