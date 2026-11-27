@@ -64,20 +64,30 @@
     var busy = false, p = null;
     // Səhifə yenidən çəkiləndə (məs. müddət dəyişəndə) düymə yenidən əlavə olunur
     setInterval(async function () {
-      var anchor = document.getElementById("addCartBtn");
+      // Ürək alt paneldə (səbət ikonunun yanında) göstərilir, həmişə görünür
+      var anchor = document.getElementById("stickyCart") || document.getElementById("addCartBtn");
       if (!anchor || document.getElementById("wishBtn") || busy) return;
       busy = true;
       if (!p) {
         var list = await products();
         p = list.filter(function (x) { return x.slug === slug; })[0] || null;
       }
-      if (p && !document.getElementById("wishBtn") && document.getElementById("addCartBtn")) {
+      var anc = document.getElementById("stickyCart") || document.getElementById("addCartBtn");
+      if (p && !document.getElementById("wishBtn") && anc) {
         var btn = document.createElement("button");
         btn.type = "button";
         btn.id = "wishBtn";
-        btn.className = "btn btn-out btn-block";
-        btn.style.marginTop = "8px";
-        document.getElementById("addCartBtn").parentNode.insertBefore(btn, document.getElementById("addCartBtn").nextSibling);
+        if (document.getElementById("stickyCart")) {
+          // Alt paneldə: səbət ikonu ilə eyni kiçik üslub
+          btn.className = "btn btn-out cart-ico";
+          btn.setAttribute("aria-label", t.add);
+          btn.title = t.add;
+          anc.parentNode.insertBefore(btn, anc);
+        } else {
+          btn.className = "btn btn-out btn-block";
+          btn.style.marginTop = "8px";
+          anc.parentNode.insertBefore(btn, anc.nextSibling);
+        }
         paint(btn, false);
         var st = await call("GET");
         var on = !!(st.ok && st.data.keys && st.data.keys.indexOf(p.product_key) !== -1);
@@ -97,6 +107,14 @@
   }
 
   function paint(btn, on) {
+    if (btn.classList.contains("cart-ico")) {
+      // İkon: boş ♡ və ya qırmızı ♥
+      btn.textContent = on ? "♥" : "♡";
+      btn.style.color = on ? "#e11d48" : "";
+      btn.style.borderColor = on ? "#e11d48" : "";
+      btn.style.fontSize = "20px";
+      return;
+    }
     btn.textContent = (on ? "♥ " : "♡ ") + (on ? t.on : t.add);
   }
 
