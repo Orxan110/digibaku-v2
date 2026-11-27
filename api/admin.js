@@ -746,6 +746,55 @@ async function inner(req, res) {
     });
   }
 
+  // ================= IP BANLARI =================
+  if (req.method === "GET" && action === "bans") {
+    await ensureCustomerTables(pool);
+    const ips = await pool.query("select ip, reason, created_at from banned_ips order by created_at desc");
+    const users = await pool.query(
+      `select cp.user_id, u.name, u.email, cp.last_ip, cp.blocked
+       from customer_profiles cp left join neon_auth."user" u on u.id::text = cp.user_id
+       where cp.last_ip is not null order by cp.updated_at desc limit 200`);
+    return res.status(200).json({ ok: true, ips: ips.rows, users: users.rows });
+  }
+
+  if (req.method === "POST" && action === "ban_add") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const ip = String(b.ip || "").trim();
+    if (!/^[0-9a-fA-F:.]{3,64}$/.test(ip)) return res.status(400).json({ ok: false, error: "IP düzgün deyil (məs: 185.12.34.56)." });
+    const reason = String(b.reason || "").trim().slice(0, 200) || null;
+    await pool.query(
+      `insert into banned_ips (ip, reason) values ($1, $2)
+       on conflict (ip) do update set reason = excluded.reason`, [ip, reason]);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "ban_remove") {
+    await ensureCustomerTables(pool);
+    const ip = String(body(req).ip || "").trim();
+    await pool.query("delete from banned_ips where ip = $1", [ip]);
+    return res.status(200).json({ ok: true });
+  }
+
+  // Hesab banı + həmin hesabın son IP-si də banlanır
+  if (req.method === "POST" && action === "ban_user") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const id = String(b.id || "");
+    const on = b.ban === true || b.ban === "true";
+    if (!id) return res.status(400).json({ ok: false, error: "Müştəri göstərilməyib." });
+    const r = await pool.query(
+      `insert into customer_profiles (user_id, blocked) values ($1, $2)
+       on conflict (user_id) do update set blocked = excluded.blocked, updated_at = now()
+       returning last_ip`, [id, on]);
+    const lastIp = r.rows[0] && r.rows[0].last_ip;
+    if (on && lastIp) {
+      await pool.query(
+        "insert into banned_ips (ip, reason) values ($1, 'hesab banı') on conflict (ip) do nothing", [lastIp]);
+    }
+    return res.status(200).json({ ok: true });
+  }
+
   // ================= PLANLI ENDİRİM =================
   if (req.method === "GET" && action === "discounts") {
     await ensureDiscountTable(pool);
