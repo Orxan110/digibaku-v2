@@ -267,15 +267,18 @@ async function expiring(req, res) {
   }
 }
 
-// Ziyarətçi sayı: hər cihaz gündə bir dəfə (anonim vid, IP saxlanmır)
+// Ziyarətçi sayı: hər cihaz gündə bir dəfə (anonim vid). Giriş edilibsə, hesaba da bağlanır. IP saxlanmır.
 let visitsReady = null;
 function ensureVisitsTable() {
   if (!visitsReady) {
-    visitsReady = pool.query(`create table if not exists site_visitors (
+    visitsReady = (async function () {
+      await pool.query(`create table if not exists site_visitors (
         day date not null,
         visitor_id text not null,
-        primary key (day, visitor_id))`)
-      .catch(function (e) { visitsReady = null; throw e; });
+        primary key (day, visitor_id))`);
+      await pool.query("alter table site_visitors add column if not exists user_id text");
+      await pool.query("alter table site_visitors add column if not exists ip text");
+    })().catch(function (e) { visitsReady = null; throw e; });
   }
   return visitsReady;
 }
@@ -288,14 +291,38 @@ async function visit(req, res) {
     const vid = String(b.vid || "");
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(vid)) return res.status(400).json({ ok: false });
     await ensureVisitsTable();
+    const user = await getUser(req);
+    const ip = clientIp(req);
     await pool.query(
-      `insert into site_visitors (day, visitor_id)
-       values ((now() at time zone 'Asia/Baku')::date, $1)
-       on conflict do nothing`, [vid]);
+      `insert into site_visitors (day, visitor_id, user_id, ip)
+       values ((now() at time zone 'Asia/Baku')::date, $1, $2, $3)
+       on conflict (day, visitor_id) do update
+         set user_id = coalesce(excluded.user_id, site_visitors.user_id), ip = excluded.ip`,
+      [vid, user ? String(user.id) : null, ip]);
+    if (user) {
+      await ensureCustomerTables(pool);
+      await pool.query(
+        `insert into customer_profiles (user_id, last_ip) values ($1, $2)
+         on conflict (user_id) do update set last_ip = excluded.last_ip`,
+        [String(user.id), ip]);
+    }
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error("visit:", e);
     return res.status(500).json({ ok: false });
+  }
+}
+
+// Ban siyahısı: middleware bu endpoint-dən IP-ləri oxuyur (yalnız IP-lər qaytarılır)
+async function bansList(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    await ensureCustomerTables(pool);
+    const r = await pool.query("select ip from banned_ips");
+    return res.status(200).json({ ips: r.rows.map(function (x) { return x.ip; }) });
+  } catch (e) {
+    console.error("bans:", e);
+    return res.status(500).json({ ips: [] });
   }
 }
 
@@ -306,6 +333,7 @@ module.exports = async function handler(req, res) {
   if (action === "review") return review(req, res);
   if (action === "wish") return wishlist(req, res);
   if (action === "visit") return visit(req, res);
+  if (action === "bans" && req.method === "GET") return bansList(req, res);
   if (action === "expiring" && req.method === "GET") return expiring(req, res);
   return res.status(400).json({ ok: false, error: "Naməlum əməliyyat." });
 };

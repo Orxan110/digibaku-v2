@@ -686,21 +686,105 @@ async function inner(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ================= ZİYARƏTÇİLƏR =================
+  // ================= ZİYARƏTÇİLƏR (tam tarixçə) =================
   if (req.method === "GET" && action === "visits") {
     await pool.query(`create table if not exists site_visitors (
         day date not null,
         visitor_id text not null,
         primary key (day, visitor_id))`);
+    await pool.query("alter table site_visitors add column if not exists user_id text");
+    // Qeydiyyat tarixi: neon_auth cədvəlində sütun adı createdAt və ya created_at ola bilər
+    const REG_DAY = "to_char((coalesce(to_jsonb(u)->>'createdAt', to_jsonb(u)->>'created_at'))::timestamptz at time zone 'Asia/Baku', 'YYYY-MM-DD')";
+    const total = await pool.query(
+      "select count(distinct visitor_id)::int as uniq, count(*)::int as visits from site_visitors");
+    const regTotal = await pool.query('select count(*)::int as n from neon_auth."user"');
     const today = await pool.query(
       "select count(*)::int as n from site_visitors where day = (now() at time zone 'Asia/Baku')::date");
     const month = await pool.query(
       "select count(distinct visitor_id)::int as n from site_visitors where day >= date_trunc('month', now() at time zone 'Asia/Baku')::date");
-    const days = await pool.query(
-      `select to_char(day, 'YYYY-MM-DD') as day, count(*)::int as n from site_visitors
-       where day > (now() at time zone 'Asia/Baku')::date - 30
-       group by day order by day desc`);
-    return res.status(200).json({ ok: true, today: today.rows[0].n, month: month.rows[0].n, days: days.rows });
+    const months = await pool.query(
+      `select to_char(date_trunc('month', day), 'YYYY-MM') as month,
+              count(distinct visitor_id)::int as uniq, count(*)::int as visits
+       from site_visitors group by 1 order by 1 desc`);
+    const dailyV = await pool.query(
+      `select to_char(day, 'YYYY-MM-DD') as day, count(*)::int as visits,
+              count(user_id)::int as registered, (count(*) - count(user_id))::int as guests
+       from site_visitors group by day`);
+    const dailyR = await pool.query(
+      `select ${REG_DAY} as day, count(*)::int as n from neon_auth."user" u group by 1`);
+    const regMap = {};
+    dailyR.rows.forEach(function (r) { if (r.day) regMap[r.day] = r.n; });
+    const dayMap = {};
+    dailyV.rows.forEach(function (r) {
+      dayMap[r.day] = { day: r.day, visits: r.visits, registered: r.registered, guests: r.guests, registrations: 0 };
+    });
+    Object.keys(regMap).forEach(function (d) {
+      if (!dayMap[d]) dayMap[d] = { day: d, visits: 0, registered: 0, guests: 0, registrations: 0 };
+      dayMap[d].registrations = regMap[d];
+    });
+    const daily = Object.keys(dayMap).sort().reverse().map(function (k) { return dayMap[k]; });
+    const users = await pool.query(
+      `select s.user_id, u.name, u.email, count(*)::int as days,
+              to_char(min(s.day), 'YYYY-MM-DD') as first_day, to_char(max(s.day), 'YYYY-MM-DD') as last_day,
+              max(${REG_DAY}) as registered_at
+       from site_visitors s left join neon_auth."user" u on u.id::text = s.user_id
+       where s.user_id is not null
+       group by s.user_id, u.name, u.email, u.id
+       order by days desc limit 500`);
+    return res.status(200).json({
+      ok: true, total_unique: total.rows[0].uniq, total_visits: total.rows[0].visits,
+      total_registered: regTotal.rows[0].n, today: today.rows[0].n, month: month.rows[0].n,
+      months: months.rows, daily: daily, users: users.rows
+    });
+  }
+
+  // ================= IP BANLARI =================
+  if (req.method === "GET" && action === "bans") {
+    await ensureCustomerTables(pool);
+    const ips = await pool.query("select ip, reason, created_at from banned_ips order by created_at desc");
+    const users = await pool.query(
+      `select cp.user_id, u.name, u.email, cp.last_ip, cp.blocked
+       from customer_profiles cp left join neon_auth."user" u on u.id::text = cp.user_id
+       where cp.last_ip is not null order by cp.updated_at desc limit 200`);
+    return res.status(200).json({ ok: true, ips: ips.rows, users: users.rows });
+  }
+
+  if (req.method === "POST" && action === "ban_add") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const ip = String(b.ip || "").trim();
+    if (!/^[0-9a-fA-F:.]{3,64}$/.test(ip)) return res.status(400).json({ ok: false, error: "IP düzgün deyil (məs: 185.12.34.56)." });
+    const reason = String(b.reason || "").trim().slice(0, 200) || null;
+    await pool.query(
+      `insert into banned_ips (ip, reason) values ($1, $2)
+       on conflict (ip) do update set reason = excluded.reason`, [ip, reason]);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "POST" && action === "ban_remove") {
+    await ensureCustomerTables(pool);
+    const ip = String(body(req).ip || "").trim();
+    await pool.query("delete from banned_ips where ip = $1", [ip]);
+    return res.status(200).json({ ok: true });
+  }
+
+  // Hesab banı + həmin hesabın son IP-si də banlanır
+  if (req.method === "POST" && action === "ban_user") {
+    await ensureCustomerTables(pool);
+    const b = body(req);
+    const id = String(b.id || "");
+    const on = b.ban === true || b.ban === "true";
+    if (!id) return res.status(400).json({ ok: false, error: "Müştəri göstərilməyib." });
+    const r = await pool.query(
+      `insert into customer_profiles (user_id, blocked) values ($1, $2)
+       on conflict (user_id) do update set blocked = excluded.blocked, updated_at = now()
+       returning last_ip`, [id, on]);
+    const lastIp = r.rows[0] && r.rows[0].last_ip;
+    if (on && lastIp) {
+      await pool.query(
+        "insert into banned_ips (ip, reason) values ($1, 'hesab banı') on conflict (ip) do nothing", [lastIp]);
+    }
+    return res.status(200).json({ ok: true });
   }
 
   // ================= PLANLI ENDİRİM =================
