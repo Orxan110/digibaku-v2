@@ -74,7 +74,7 @@
       if (!validatePassword(password)) return { ok: false, error: msg("shortPassword") };
       var r = await call("/sign-up/email", { name: name.trim(), email: email.trim(), password: password });
       if (!r.ok) return r;
-      try { localStorage.setItem("digibaku_authhint", "1"); } catch (e) {}
+      try { localStorage.setItem("digibaku_authhint", "1"); localStorage.removeItem("digibaku_bal"); localStorage.removeItem("digibaku_balx"); } catch (e) {}
       return { ok: true, message: msg("registered"), data: r.data };
     },
     async login(opts) {
@@ -83,7 +83,7 @@
       if (!password) return { ok: false, error: msg("shortPassword") };
       var r = await call("/sign-in/email", { email: email.trim(), password: password });
       if (!r.ok) return r;
-      try { localStorage.setItem("digibaku_authhint", "1"); } catch (e) {}
+      try { localStorage.setItem("digibaku_authhint", "1"); localStorage.removeItem("digibaku_bal"); localStorage.removeItem("digibaku_balx"); } catch (e) {}
       return { ok: true, message: msg("loggedIn"), data: r.data };
     },
     async logout() {

@@ -1,37 +1,44 @@
 /* DigiBaku — ümumi header, naviqasiya, səbət, üzən düymələr, RU/EN tərcümə, sayt parametrləri, SEO, şəkil xətası qoruması. */
-/* DigiBaku — balans anbarı: dəyər yadda saxlanır (localStorage), header ilk çəkilişdən balansı göstərir (yanıb-sönmə yoxdur) */
+/* DigiBaku — balans anbarı: balans, tarixçə və keşbek qaydaları localStorage-da saxlanır.
+   Səhifə yenilənəndə hamısı DƏRHAL göstərilir (gözləmə yoxdur), server cavabı arxa planda yeniləyir. */
 (function () {
-  var KEY = "digibaku_bal";
+  var KEY = "digibaku_bal";       // yalnız məbləğ (header üçün)
+  var KX = "digibaku_balx";       // tam məlumat: balans + tarixçə
+  var KI = "digibaku_cbinfo";     // keşbek faizi, qaydalar və balans artırma təlimatı
   var L = {
-    az: { lbl: "Balans:", up: "Balansınızı artırın", t: "Balans" },
-    ru: { lbl: "Баланс:", up: "Пополните баланс", t: "Баланс" },
-    en: { lbl: "Balance:", up: "Top up balance", t: "Balance" }
+    az: { lbl: "Balans:", t: "Balans" },
+    ru: { lbl: "Баланс:", t: "Баланс" },
+    en: { lbl: "Balance:", t: "Balance" }
   };
-  var loading = null, last = null, subs = [];
+  var loading = null, last = null, subs = [], infoLoading = null;
 
   function lang() { var l = ""; try { l = localStorage.getItem("digibaku_lang"); } catch (e) {} return L[l] ? l : "az"; }
   function authed() { try { return /(?:^|; )digibaku_auth=1/.test(document.cookie); } catch (e) { return false; } }
+  function readJson(k) { try { var s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
   function cached() {
     try { var v = localStorage.getItem(KEY); if (v === null || v === "") return null; var n = Number(v); return isNaN(n) ? null : n; }
     catch (e) { return null; }
   }
+  function cachedData() { var d = readJson(KX); return d && typeof d === "object" ? d : null; }
+  function info() { var d = readJson(KI); return d && typeof d === "object" ? d : null; }
+
+  // Balans həmişə göstərilir: dəyər hələ gəlməyibsə "…" (yer saxlanır, düymə itmir)
   function inner() {
-    var b = cached(); if (b === null) return "";
+    var b = cached();
     var t = L[lang()];
-    return b > 0 ? '<span class="hb-l">' + t.lbl + "</span> " + b.toFixed(2) + " ₼" : t.up;
+    return '<span class="hb-l">' + t.lbl + "</span> " + (b === null ? "…" : b.toFixed(2)) + " ₼";
   }
   // header HTML-nə qoşulan balans düyməsi (authLinksHtml çağırır)
   function chip() {
     if (!authed()) return "";
-    var h = inner(); if (!h) return "";
-    return '<a id="hdrBal" class="hdr-bal" href="profile.html#balans" title="' + L[lang()].t + '">' + h + "</a>";
+    return '<a id="hdrBal" class="hdr-bal" href="profile.html#balans" title="' + L[lang()].t + '">' + inner() + "</a>";
   }
   function paint() {
     var box = document.getElementById("authLinks"); if (!box) return;
     var link = box.querySelector('a[href="profile.html"]');
     var el = document.getElementById("hdrBal");
-    var h = authed() ? inner() : "";
-    if (!link || !h) { if (el) el.remove(); return; }
+    if (!link || !authed()) { if (el) el.remove(); return; }
+    var h = inner();
     if (!el) {
       el = document.createElement("a"); el.id = "hdrBal"; el.className = "hdr-bal";
       el.href = "profile.html#balans"; el.title = L[lang()].t;
@@ -41,19 +48,28 @@
   }
   function notify() { subs.forEach(function (f) { try { f(last); } catch (e) {} }); }
 
-  async function fetchOnce() {
-    var h = {};
-    try {
-      if (window.DigiAuth && DigiAuth.getToken) {
-        var tk = await DigiAuth.getToken();
-        if (tk) h.Authorization = "Bearer " + tk;
-      }
-    } catch (e) {}
+  function saveInfo(c) {
+    if (!c || typeof c !== "object") return;
+    try { localStorage.setItem(KI, JSON.stringify(c)); } catch (e) {}
+  }
+
+  async function req(h) {
     var r = await fetch("/api/shop?action=balance", { credentials: "include", headers: h, cache: "no-store" });
     if (r.status === 401) return { unauth: true };
     if (!r.ok) return null;
     var d = await r.json().catch(function () { return null; });
     return d && d.ok !== false ? d : null;
+  }
+  // Əvvəl yalnız cookie ilə (sürətli, əlavə token sorğusu yoxdur); alınmasa token ilə
+  async function fetchOnce() {
+    var d = await req({});
+    if (d && d.unauth) {
+      var tk = null;
+      try { if (window.DigiAuth && DigiAuth.getToken) tk = await DigiAuth.getToken(); } catch (e) {}
+      if (!tk) return { unauth: true };
+      d = await req({ Authorization: "Bearer " + tk });
+    }
+    return d;
   }
 
   // Balansı serverdən alır; xəta olsa 3 dəfə yenidən cəhd edir. Mövcud dəyəri heç vaxt silmir.
@@ -68,7 +84,11 @@
           if (d && d.unauth) break;
           if (d) {
             last = d;
-            try { localStorage.setItem(KEY, String(Number(d.balance || 0))); } catch (e) {}
+            try {
+              localStorage.setItem(KEY, String(Number(d.balance || 0)));
+              localStorage.setItem(KX, JSON.stringify({ balance: Number(d.balance || 0), ledger: d.ledger || [] }));
+            } catch (e) {}
+            if (d.cashback) saveInfo(d.cashback);
             paint(); notify();
             return d;
           }
@@ -79,11 +99,41 @@
     loading.then(function () { loading = null; }, function () { loading = null; });
     return loading;
   }
-  function clear() { last = null; try { localStorage.removeItem(KEY); } catch (e) {} paint(); }
+
+  // Keşbek faizi, qaydalar və balans artırma təlimatı (hamı üçün açıq). Keşdən dərhal, arxa planda yenilənir.
+  function loadInfo() {
+    if (infoLoading) return infoLoading;
+    infoLoading = (async function () {
+      for (var i = 0; i < 3; i++) {
+        if (i) await new Promise(function (r) { setTimeout(r, 1000 * i); });
+        try {
+          var r = await fetch("/api/shop?action=cashback_info", { cache: "no-store" });
+          if (r.ok) {
+            var d = await r.json().catch(function () { return null; });
+            if (d && d.cashback) { saveInfo(d.cashback); return d.cashback; }
+          }
+        } catch (e) {}
+      }
+      return info();
+    })();
+    infoLoading.then(function () { infoLoading = null; }, function () { infoLoading = null; });
+    return infoLoading;
+  }
+
+  function clear() {
+    last = null;
+    try { localStorage.removeItem(KEY); localStorage.removeItem(KX); } catch (e) {}
+    paint();
+  }
 
   window.DigiBalance = {
     chip: chip, paint: paint, refresh: refresh, clear: clear, cached: cached,
-    data: function () { return last; },
+    info: info, loadInfo: loadInfo,
+    data: function () {
+      if (last) return last;
+      var c = cachedData();
+      return c && c.ledger ? c : null;
+    },
     on: function (f) { subs.push(f); }
   };
 
@@ -95,6 +145,8 @@
     if (!box) { setTimeout(watch, 300); return; }
     new MutationObserver(function () { paint(); }).observe(box, { childList: true });
   })();
+  // Səhifə açılan kimi (sessiya yoxlanışını gözləmədən) balansı yenilə
+  if (authed()) refresh();
 })();
 
 (function(){
@@ -342,17 +394,17 @@
     az:{home:"Ana səhifə",products:"Məhsullar",cart:"Səbət",orders:"Sifarişlər",profile:"Profilim",
         login:"Daxil ol",register:"Qeydiyyat",search:"Məhsul axtar...",faq:"FAQ",contact:"Əlaqə",
         about:"Haqqımızda",terms:"İstifadə şərtləri",privacy:"Məxfilik siyasəti",rules:"Sifariş və xidmət qaydaları",
-        menu:"Menyu",logout:"Çıxış",add:"Səbətə at",details:"Ətraflı",from:"dən",empty:"Məhsul tapılmadı.",
+        cashAbout:"Keşbek haqqında",balHow:"Balans necə artırılır",menu:"Menyu",logout:"Çıxış",add:"Səbətə at",details:"Ətraflı",from:"dən",empty:"Məhsul tapılmadı.",
         cartEmpty:"Səbətiniz boşdur.",total:"Ümumi",checkout:"Sifarişi təsdiq et"},
     ru:{home:"Главная",products:"Товары",cart:"Корзина",orders:"Заказы",profile:"Профиль",
         login:"Вход",register:"Регистрация",search:"Поиск товаров...",faq:"FAQ",contact:"Контакты",
         about:"О нас",terms:"Условия использования",privacy:"Политика конфиденциальности",rules:"Правила заказа и услуг",
-        menu:"Меню",logout:"Выйти",add:"В корзину",details:"Подробнее",from:"от",empty:"Товары не найдены.",
+        cashAbout:"О кешбэке",balHow:"Как пополнить баланс",menu:"Меню",logout:"Выйти",add:"В корзину",details:"Подробнее",from:"от",empty:"Товары не найдены.",
         cartEmpty:"Корзина пуста.",total:"Итого",checkout:"Подтвердить заказ"},
     en:{home:"Home",products:"Products",cart:"Cart",orders:"Orders",profile:"Profile",
         login:"Sign in",register:"Register",search:"Search products...",faq:"FAQ",contact:"Contact",
         about:"About us",terms:"Terms of use",privacy:"Privacy policy",rules:"Order & service rules",
-        menu:"Menu",logout:"Sign out",add:"Add to cart",details:"Details",from:"from",empty:"No products found.",
+        cashAbout:"About cashback",balHow:"How to top up balance",menu:"Menu",logout:"Sign out",add:"Add to cart",details:"Details",from:"from",empty:"No products found.",
         cartEmpty:"Your cart is empty.",total:"Total",checkout:"Confirm order"}
   };
   var lang = localStorage.getItem("digibaku_lang");
@@ -502,6 +554,7 @@
      '</div></header>'+
      '<div class="drawer" id="drawer"><div class="drawer-panel"><button class="drawer-close" id="closeDrawer" aria-label="close">×</button>'+
        '<a href="index.html">'+DB.t("home")+'</a><a href="products.html">'+DB.t("products")+'</a>'+
+       '<a href="wallet.html#kesbek">'+DB.t("cashAbout")+'</a><a href="wallet.html#balans">'+DB.t("balHow")+'</a>'+
        '<a href="faq.html">'+DB.t("faq")+'</a><a href="contact.html">'+DB.t("contact")+'</a><a href="about.html">'+DB.t("about")+'</a>'+
        '<a href="rules.html">'+DB.t("rules")+'</a><a href="privacy.html">'+DB.t("privacy")+'</a><a href="terms.html">'+DB.t("terms")+'</a>'+
        '<a href="#" id="logoutLink">'+DB.t("logout")+'</a></div></div>';

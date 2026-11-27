@@ -245,9 +245,8 @@
   function locale() { return lang === "ru" ? "ru-RU" : lang === "en" ? "en-GB" : "az-AZ"; }
 
   // Qaydalar hamı üçün açıq endpoint-dən gəlir (balans yüklənməsə də göstərilir)
-  var infoCache = null, infoLoading = null;
+  var infoCache = (window.DigiBalance && DigiBalance.info()) || null, infoLoading = null;
   function loadInfo() {
-    if (infoCache) return Promise.resolve(infoCache);
     if (infoLoading) return infoLoading;
     infoLoading = (async function () {
       for (var i = 0; i < 3; i++) {
@@ -256,11 +255,11 @@
           var r = await fetch("/api/shop?action=cashback_info", { cache: "no-store" });
           if (r.ok) {
             var d = await r.json().catch(function () { return null; });
-            if (d && d.cashback) { infoCache = d.cashback; return infoCache; }
+            if (d && d.cashback) { infoCache = d.cashback; try { localStorage.setItem("digibaku_cbinfo", JSON.stringify(infoCache)); } catch (e) {} return infoCache; }
           }
         } catch (e) {}
       }
-      return null;
+      return infoCache;
     })();
     infoLoading.then(function () { infoLoading = null; }, function () { infoLoading = null; });
     return infoLoading;
@@ -286,7 +285,7 @@
   async function renderBalance(box) {
     var sec = makeSection("balSection", bt.balTitle, box);
     var out = sec.querySelector(".secBody");
-    var state = { bal: window.DigiBalance ? DigiBalance.cached() : null, ledger: null, info: null, failed: false };
+    var state = { bal: window.DigiBalance ? DigiBalance.cached() : null, ledger: null, info: infoCache, failed: false };
 
     function draw() {
       if (!document.body.contains(sec)) return;
@@ -364,7 +363,7 @@
         '<p class="muted" style="font-size:13px;margin-top:6px">' + esc(bt.cashSub) + "</p></div>" +
         '<div class="card-box" style="margin-top:8px"><b style="font-size:14px">' + esc(bt.rulesTitle) + "</b>" + ul(rules) + "</div>";
     }
-    function go() { loadInfo().then(draw); }
+    function go() { if (infoCache) draw(infoCache); loadInfo().then(draw); }
     out.addEventListener("click", function (e) {
       if (e.target && e.target.getAttribute && e.target.getAttribute("data-cashretry")) { out.innerHTML = '<p class="muted">...</p>'; go(); }
     });
